@@ -632,13 +632,10 @@ function typeOf(e) {
   if (!c.length) return 'Concept';
   const ex = c.filter(t => e.typeSrc?.[t]?.tier === 'explicit'); if (ex.length) c = ex;
   else {
-    // a class guessed only from the slot an entity fills ("X supplies Y" → Organization) never overrides one based on the
-    // name, a table, a definition or a model, nor a concept the source states (a keyword); it only fills a gap
     const ctxOnly = t => { const x = e.typeSrc?.[t]?.x; return !!x && x.size > 0 && [...x].every(k => CTX_X.has(k)); };
     const named = c.filter(t => !ctxOnly(t));
     if (named.length) c = named;
     else if (e.typeSrc?.Concept?.tier === 'explicit') return 'Concept';
-    // the name itself ("Contoso Ltd", a known company) beats a class taken from the table / file it sits in
     const fromContainer = t => { const x = e.typeSrc?.[t]?.x; return !!x && [...x].every(k => k === 'table_name' || k === 'kv_signature' || CTX_X.has(k)); };
     if (c.includes('Organization') && ORG_NAME_RX.test(e.name) && c.filter(t => t !== 'Organization').every(fromContainer)) return 'Organization';
   }
@@ -1767,9 +1764,6 @@ function classForWord(w) {
   return pick(names.filter(n => camelParts(n).length > 1 && camelParts(n).slice(-1)[0].toLowerCase() === W)) || pick(names.filter(n => camelParts(n).length > 1 && camelParts(n)[0].toLowerCase() === W));
 }
 function isA(c, anc) { let g = 0; while (c && g++ < 8) { if (c === anc) return true; c = S.declared?.classes?.[c]?.parent || S.llm?.classes?.[c]?.parent || PARENT[c] || S.alignParents?.[c] || headParent(c) || null; } return false; }
-/* Classes named by a source's structure (a table "customers.csv" → Customer, a JSON list "suppliers" → Supplier) are
-   tied to the core class most of their members also have elsewhere (prose, other files, the name itself), so the
-   same kind of thing is one branch of the ontology whatever format it came from: Customer ⊂ Organization. */
 const CORE_CLASSES = new Set(['Person', 'Organization', 'Location', 'Product', 'Event', 'Project', 'Document', 'Publication', 'Department']);
 function alignClasses() {
   S.alignParents = {};
@@ -1788,8 +1782,6 @@ function alignClasses() {
   const n = Object.keys(S.alignParents).length;
   if (n) log(`  ${n} source-specific class(es) aligned: ${Object.entries(S.alignParents).map(([c, p]) => `${c} ⊂ ${p}`).join(', ')}`);
 }
-/* Each relationship type's usual domain → range (≥ 60% of its typed links, ≥ 3 links); links that break it are listed
-   in the Quality panel and the usual pair is exported as rdfs:domain/range and SHACL shapes. */
 function schemaCheck() {
   const by = new Map();
   for (const r of S.rels.values()) {
@@ -1804,7 +1796,6 @@ function schemaCheck() {
     if (L.length < 3) continue;
     const dom = top(L.map(x => x.ta).filter(t => t !== 'Concept')), rng = top(L.map(x => x.tb).filter(t => t !== 'Concept'));
     types.push({ type, domain: dom, range: rng, n: L.length });
-    // containment relations nest: a place LOCATED_IN a place, a unit PART_OF a unit — the container's class is a valid subject too
     const nests = /^(LOCATED_IN|PART_OF|REPORTS_TO|SUBCLASS_OF|MEMBER_OF|SUBSIDIARY_OF|CHILD_OF|BELONGS_TO)$/.test(type);
     for (const x of L) { tot++; if ((fits(x.ta, dom) || (nests && fits(x.ta, rng))) && fits(x.tb, rng)) ok++; else violations.push({ type, a: x.a.name, b: x.b.name, ta: x.ta, tb: x.tb, dom, rng }); }
   }
