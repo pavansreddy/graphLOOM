@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>graphLOOM · Auto-Ontology Explorer</title>
+<title>graphLOOM · Ontology & Knowledge Graph Explorer</title>
 <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
 <style>
 :root{
@@ -222,7 +222,7 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
   <button class="btn icon on" id="tglLeft" title="Show / hide the ingest & settings panel  ( [ )" aria-label="Toggle left panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>
   <div class="brand">
     <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><line x1="7" y1="8" x2="20" y2="7" stroke="var(--brand-grey)" stroke-width="1.8"/><line x1="7" y1="8" x2="13" y2="21" stroke="var(--brand-grey)" stroke-width="1.8"/><line x1="20" y1="7" x2="13" y2="21" stroke="var(--brand-grey)" stroke-width="1.8"/><circle cx="7" cy="8" r="4.5" fill="var(--brand-steel)"/><circle cx="20" cy="7" r="4.5" fill="var(--brand-terracotta)"/><circle cx="13" cy="21" r="5" fill="var(--brand-olive)"/></svg>
-    <div><b>graphLOOM</b><small>Auto-Ontology Explorer</small></div>
+    <div><b>graphLOOM</b><small>Ontology &amp; Knowledge Graph Explorer</small></div>
   </div>
   <div class="seg" role="tablist" aria-label="View">
     <button id="vOnto" class="on" role="tab" title="Schema: classes and relationship types (shortcut: O)"><span class="dot"></span>Ontology</button>
@@ -241,6 +241,7 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
       <button data-x="push">Push to Neo4j (HTTP API)…<small>Write straight into a running Neo4j</small></button>
       <button data-x="json">Graph JSON<small>Ontology + nodes + relationships</small></button>
       <button data-x="ttl">Ontology (OWL / Turtle)<small>Classes, object & datatype properties</small></button>
+      <button data-x="ossie">Semantic model (Apache Ossie YAML)<small>Classes as datasets, relations as keys, synonyms and status — open semantic-layer format</small></button>
       <button data-x="xlsx">Excel workbook (.xlsx)<small>Summary, ontology, entities, links + review columns — load it back after review</small></button>
       <button data-x="csv">Triples CSV<small>subject, predicate, object, source</small></button>
       <button data-x="png">PNG snapshot<small>Current view</small></button>
@@ -286,7 +287,7 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
   </div>
   <div class="sec">
     <h3>2 · Extraction engine</h3>
-    <label class="radio on" id="rHeur"><input type="radio" name="eng" value="heur" checked hidden><div><b>Built-in auto-ontology</b><span>Offline, instant. Pattern-based NER + relation mining, schema induced bottom-up from instances.</span></div></label>
+    <label class="radio on" id="rHeur"><input type="radio" name="eng" value="heur" checked hidden><div><b>Built-in extractor</b><span>Offline, instant. Pattern-based NER + relation mining, schema induced bottom-up from instances.</span></div></label>
     <label class="radio" id="rLLM"><input type="radio" name="eng" value="llm" hidden><div><b>NVIDIA NIM (LLM)</b><span>Two-pass: LLM induces the ontology, then extracts triples constrained to it.</span></div></label>
     <div id="llmCfg" style="display:none">
       <label class="field"><span>Endpoint (OpenAI-compatible /chat/completions)</span><input id="llmUrl" value="https://integrate.api.nvidia.com/v1/chat/completions"></label>
@@ -331,7 +332,7 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
       <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><g stroke="var(--text-3)" stroke-width="2"><line x1="16" y1="18" x2="46" y2="14"/><line x1="16" y1="18" x2="30" y2="46"/><line x1="46" y1="14" x2="30" y2="46"/><line x1="30" y1="46" x2="52" y2="48"/></g><circle cx="16" cy="18" r="9" fill="var(--brand-steel)"/><circle cx="46" cy="14" r="9" fill="var(--brand-terracotta)"/><circle cx="30" cy="46" r="10" fill="var(--brand-olive)"/><circle cx="52" cy="48" r="6" fill="var(--brand-grey)" stroke="var(--text-3)" stroke-width="1"/></svg>
       <h2>Turn a pile of files into a graph</h2>
       <div>Upload files or pick a folder. You'll see the <b>ontology</b> first — the types of things and how they relate. Flip the toggle to expand it into the <b>knowledge graph</b> of actual entities.</div>
-      <div class="flow"><span>Ingest</span><em>→</em><span>Parse</span><em>→</em><span>Auto-ontology</span><em>→</em><span>Extract triples</span><em>→</em><span>Neo4j graph</span></div>
+      <div class="flow"><span>Ingest</span><em>→</em><span>Parse</span><em>→</em><span>Induce ontology</span><em>→</em><span>Extract triples</span><em>→</em><span>Neo4j graph</span></div>
       <button class="btn primary" id="sample2">Try it with sample files</button>
     </div>
   </div>
@@ -365,7 +366,7 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
     <label class="field"><span>Database</span><input id="neoDb" value="neo4j"></label>
     <label class="field"><span>User</span><input id="neoUser" value="neo4j"></label>
     <label class="field"><span>Password</span><input id="neoPass" type="password"></label>
-    <label class="opt" style="justify-content:flex-start"><input type="checkbox" id="neoReplace"> <span>Replace what earlier pushes from this tool created (deletes only nodes tagged <code>_source: auto-ontology</code>)</span></label>
+    <label class="opt" style="justify-content:flex-start"><input type="checkbox" id="neoReplace"> <span>Replace what earlier pushes from this tool created (deletes only nodes this tool tagged with <code>_source</code>)</span></label>
     <div class="log" id="neoLog" style="margin:8px 0"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button class="btn" value="cancel">Close</button>
@@ -566,7 +567,7 @@ const PCT_RX = /\b\d+(?:\.\d+)?\s?%/;
 const S = {
   docs: [], ents: new Map(), rels: new Map(), alias: new Map(), seq: 0,
   view: 'ontology', hidden: new Set(), focus: null, layout: 'force', frozen: false,
-  llm: null, viewData: null, edgeData: new Map(), engineUsed: 'heur', diag: newDiag(), nsOf: new Map(), dupDecisions: new Map()
+  llm: null, viewData: null, edgeData: new Map(), engineUsed: 'heur', diag: newDiag(), nsOf: new Map(), dupDecisions: new Map(), terms: new Map()
 };
 function resetStore() { S.ents = new Map(); S.rels = new Map(); S.alias = new Map(); S.seq = 0; S.llm = null; S.declared = null; S.focus = null; S.rejected = null; S.idIndex = null; S.pendingRefs = []; S._scholars = []; S._pos = new Map(); S.alignParents = {}; S.schema = null; S.diag = newDiag(); }
 
@@ -2988,7 +2989,7 @@ async function rebuildNow(opt = {}) {
     if (eng === 'llm') {
       if (!cfg.key && /nvidia\.com/.test(cfg.url)) { log('NIM selected but no API key — using built-in engine.', 'w'); await heuristicExtract(textDocs); }
       else {
-        log('Engine: NVIDIA NIM two-pass auto-ontology');
+        log('Engine: NVIDIA NIM two-pass extraction');
         const snapshot = { ents: new Map(S.ents), rels: new Map(S.rels), alias: new Map(S.alias), seq: S.seq };
         try { await llmExtract(textDocs, cfg); S.engineUsed = 'llm'; }
         catch (e) {
@@ -2996,7 +2997,7 @@ async function rebuildNow(opt = {}) {
           Object.assign(S, snapshot); S.llm = null; await heuristicExtract(textDocs);
         }
       }
-    } else { log('Engine: built-in auto-ontology'); await heuristicExtract(textDocs); }
+    } else { log('Engine: built-in extractor'); await heuristicExtract(textDocs); }
   }
   mergePluralVariants();
   linkEmailDomains();
@@ -3163,7 +3164,7 @@ const PARENT = { Person: 'Agent', Organization: 'Agent', Department: 'Organizati
 function buildOntology(full) {
   const classes = new Map();
   const DC = S.declared?.classes || {};
-  const ens = (t) => { if (!classes.has(t)) classes.set(t, { name: t, count: 0, props: new Map(), examples: [], desc: S.llm?.classes?.[t]?.description || DC[t]?.description || DEFAULT_DESC[t] || '', parent: S.llm?.classes?.[t]?.parent || DC[t]?.parent || PARENT[t] || headParent(t) || S.alignParents?.[t] || null, abbr: DC[t]?.abbr || null, declared: !!DC[t] }); return classes.get(t); };
+  const ens = (t) => { if (!classes.has(t)) classes.set(t, { name: t, count: 0, props: new Map(), examples: [], ...termFields('C', t, S.llm?.classes?.[t]?.description || DC[t]?.description || DEFAULT_DESC[t] || '', DC[t]?.abbr), parent: S.llm?.classes?.[t]?.parent || DC[t]?.parent || PARENT[t] || headParent(t) || S.alignParents?.[t] || null, abbr: DC[t]?.abbr || null, declared: !!DC[t] }); return classes.get(t); };
   const byMent = [...full.ents].sort((a, b) => b.mentions - a.mentions);
   for (const e of byMent) {
     const c = ens(typeOf(e)); c.count++;
@@ -3178,18 +3179,48 @@ function buildOntology(full) {
     if (!a || !b) continue;
     if (SYMMETRIC.has(r.type) && a > b) [a, b] = [b, a];
     const k = a + '|' + r.type + '|' + b;
-    if (!rmap.has(k)) rmap.set(k, { domain: a, type: r.type, range: b, count: 0, samples: [], desc: S.llm?.relations?.find(x => x.name === r.type)?.description || '' });
+    if (!rmap.has(k)) rmap.set(k, { domain: a, type: r.type, range: b, count: 0, samples: [], ...termFields('R', r.type, S.llm?.relations?.find(x => x.name === r.type)?.description || '') });
     const x = rmap.get(k); x.count++; x.support = (x.support || 0) + (r.weight || 1); if (x.samples.length < 10) x.samples.push(r);
   }
   for (const dr of S.declared?.relations || []) {
     if (!dr.range || S.hidden.has(dr.domain) || S.hidden.has(dr.range)) continue;
     const k = dr.domain + '|' + dr.name + '|' + dr.range;
     const inst = [...rmap.values()].filter(x => x.type === dr.name && isA(x.domain, dr.domain) && isA(x.range, dr.range) && !(x.domain === dr.domain && x.range === dr.range));
-    if (!rmap.has(k)) rmap.set(k, { domain: dr.domain, type: dr.name, range: dr.range, count: 0, samples: [], desc: `declared: “${dr.evidence}”`, declared: true });
-    const x = rmap.get(k); x.declared = true; x.desc ||= `declared: “${dr.evidence}”`;
+    if (!rmap.has(k)) rmap.set(k, { domain: dr.domain, type: dr.name, range: dr.range, count: 0, samples: [], ...termFields('R', dr.name, `declared: “${dr.evidence}”`), declared: true });
+    const x = rmap.get(k); x.declared = true; x.desc0 ||= `declared: “${dr.evidence}”`; x.desc ||= x.desc0;
     if (inst.length) x.viaSub = inst.reduce((a, y) => a + y.count, 0);
   }
   return { classes, rels: [...rmap.values()] };
+}
+const SYN_OF = {}; for (const [w, c] of Object.entries(SYN_CLASS)) if (w !== c.toLowerCase()) (SYN_OF[c] ||= []).push(w);
+const termOf = (kind, n) => S.terms?.get(kind + ':' + n) || null;
+function termFields(kind, n, desc0, abbr) {
+  const t = termOf(kind, n), syn = new Set(t?.syn || []);
+  if (kind === 'C') { if (abbr) syn.add(abbr); (SYN_OF[n] || []).forEach(w => syn.add(w)); }
+  syn.delete(n);
+  return { desc0, desc: t?.desc || desc0, synonyms: [...syn], userSyn: t?.syn || [], status: t?.status === 'certified' ? 'certified' : 'draft' };
+}
+function setTerm(key, patch) {
+  const nx = { ...(S.terms.get(key) || {}), ...patch };
+  if (!nx.desc && !(nx.syn || []).length && nx.status !== 'certified') S.terms.delete(key); else S.terms.set(key, nx);
+  const [kind, ...rest] = key.split(':'), n = rest.join(':'), o = S.ontology;
+  if (o) {
+    const targets = kind === 'C' ? [o.classes.get(n)].filter(Boolean) : o.rels.filter(r => r.type === n);
+    for (const x of targets) { const abbr = kind === 'C' ? S.declared?.classes?.[n]?.abbr : null; Object.assign(x, termFields(kind, n, x.desc0, abbr)); }
+    if (kind === 'C' && targets[0] && typeof nodesDS !== 'undefined' && nodesDS.get('C:' + n)) { const c = targets[0]; nodesDS.update({ id: 'C:' + n, label: classLabel(c), title: classTitle(c) }); }
+  }
+  saveSession();
+}
+const classLabel = c => `*${c.name}*${c.status === 'certified' ? ' ✓' : ''}\n${fmt(c.count)}`;
+const classTitle = c => `${c.name}${c.status === 'certified' ? ' (certified)' : ''}\n${c.count} instance(s)\n${c.desc || ''}${c.synonyms?.length ? '\nalso: ' + c.synonyms.join(', ') : ''}\n\nDouble-click to explore instances`;
+const FIELD_CSS = 'width:100%;box-sizing:border-box;font:inherit;font-size:12px;padding:5px 7px;margin:3px 0 7px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--text)';
+function termEditor(kind, n, x) {
+  const cert = x.status === 'certified', auto = x.synonyms.filter(s => !x.userSyn.includes(s));
+  return `<h4>Term</h4><div data-term="${esc(kind + ':' + n)}" style="font-size:12px">
+    <label class="muted">Description</label><textarea rows="2" data-f="desc" style="${FIELD_CSS};resize:vertical">${esc(x.desc || '')}</textarea>
+    <label class="muted">Synonyms <span style="opacity:.75">(comma-separated)</span></label><input data-f="syn" value="${esc(x.userSyn.join(', '))}" placeholder="${esc(auto.join(', ') || 'e.g. client, account')}" style="${FIELD_CSS}">
+    ${auto.length ? `<div class="muted" style="margin:-3px 0 7px">built-in: ${auto.map(esc).join(', ')}</div>` : ''}
+    <div style="display:flex;gap:8px;align-items:center"><span class="tier ${cert ? 'explicit' : 'inferred'}">${cert ? 'certified' : 'draft'}</span><button class="btn sm" data-certify="${cert ? '0' : '1'}">${cert ? 'Back to draft' : 'Certify ✓'}</button></div></div>`;
 }
 const DEFAULT_DESC = {
   Person: 'An individual human being.', Organization: 'A company, institution, agency or other formal group.', Location: 'A geographic place: city, country, site or address.',
@@ -3298,7 +3329,7 @@ function renderOntology(seeds) {
     const col = colorFor(c.name);
     const w = 70 + Math.round(60 * Math.sqrt(c.count / maxC));
     const p = seeds && seeds[c.name];
-    nodes.push({ id: 'C:' + c.name, label: `*${c.name}*\n${fmt(c.count)}`, title: `${c.name}\n${c.count} instance(s)\n${c.desc || ''}\n\nDouble-click to explore instances`,
+    nodes.push({ id: 'C:' + c.name, label: classLabel(c), title: classTitle(c),
       color: nodeColor(col), font: { multi: 'markdown', size: 13, color: inkOn(col), bold: { size: 14, color: inkOn(col) } }, widthConstraint: { minimum: w, maximum: w }, borderWidth: 2.5, mass: 2,
       ...(isExtraClass(c.name) ? { shapeProperties: { borderDashes: [6, 4] }, borderWidth: 3, color: { ...nodeColor(col), border: css('--text-2') } } : {}),
       ...(p ? { x: p.x, y: p.y } : {}) });
@@ -3575,6 +3606,7 @@ function showNode(nid) {
     d.innerHTML = `<span class="pill" style="background:${col};color:${inkOn(col)}">Class</span><h2>${esc(name)}</h2>
       <div class="muted">${esc(c.desc || 'Induced from the data.')}</div>
       <table class="kv" style="margin-top:10px"><tr><td>instances</td><td>${fmt(c.count)}</td></tr>${c.parent ? `<tr><td>subClassOf</td><td>${esc(c.parent)}</td></tr>` : ''}${subs.length ? `<tr><td>subclasses</td><td>${subs.map(x => esc(x.name)).join(', ')}</td></tr>` : ''}<tr><td>Neo4j label</td><td><code>:${esc(name)}</code></td></tr></table>
+      ${termEditor('C', name, c)}
       ${props.length ? `<h4>Datatype properties</h4>` + props.slice(0, 20).map(([k, n]) => `<div style="margin:5px 0"><div style="display:flex;justify-content:space-between;font-size:12px"><code>${esc(k)}</code><span class="muted">${Math.round(100 * n / c.count)}%</span></div><div class="bar"><i style="width:${Math.round(100 * n / c.count)}%"></i></div></div>`).join('') : ''}
       ${outs.length ? `<h4>Outgoing relationship types</h4>` + outs.sort((a, b) => b.count - a.count).map(r => relRow('out', r.type, `<i class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colorFor(r.range)}"></i> ${esc(r.range)}`, r.count, `data-cls="${esc(r.range)}"`)).join('') : ''}
       ${ins.length ? `<h4>Incoming relationship types</h4>` + ins.sort((a, b) => b.count - a.count).map(r => relRow('in', r.type, `<i class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colorFor(r.domain)}"></i> ${esc(r.domain)}`, r.count, `data-cls="${esc(r.domain)}"`)).join('') : ''}
@@ -3622,6 +3654,7 @@ function showEdge(eid) {
     d.innerHTML = `<span class="pill" style="background:var(--panel-2);color:var(--text-2)">Relationship type</span><h2>${esc(r.type)}</h2>
       ${r.desc ? `<div class="muted">${esc(r.desc)}</div>` : ''}
       <table class="kv" style="margin-top:10px"><tr><td>pattern</td><td><code>(:${esc(r.domain)})-[:${esc(r.type)}]->(:${esc(r.range)})</code></td></tr><tr><td>domain</td><td>${esc(r.domain)}</td></tr><tr><td>range</td><td>${esc(r.range)}</td></tr><tr><td>instances</td><td>${fmt(r.count)}</td></tr>${SYMMETRIC.has(r.type) ? '<tr><td>symmetric</td><td>yes</td></tr>' : ''}</table>
+      ${termEditor('R', r.type, r)}
       <h4>Sample triples</h4>${r.samples.map(s => `<div class="rl" data-ent="${s.from}"><span class="tg">${esc(S.ents.get(s.from)?.name)} <span class="arrow">—${esc(s.type)}→</span> ${esc(S.ents.get(s.to)?.name)}</span></div>`).join('')}
       ${r.samples[0]?.evidence?.[0] ? `<h4>Evidence</h4><div class="ev">${esc(r.samples[0].evidence[0].text)}<small>${esc(r.samples[0].evidence[0].doc)}</small></div>` : ''}`;
     return;
@@ -3640,6 +3673,18 @@ $('#details').addEventListener('click', ev => {
   else if (t.dataset.nbr) { S.focus = { kind: 'entity', value: t.dataset.nbr }; render(); setTimeout(() => focusEntity(t.dataset.nbr), 50); }
   else if (t.dataset.ent) focusEntity(t.dataset.ent);
   else if (t.dataset.cls) { if (S.view !== 'ontology') setView('ontology'); setTimeout(() => { const id = 'C:' + t.dataset.cls; if (nodesDS.get(id)) { network.selectNodes([id]); network.focus(id, { scale: 1, animation: { duration: 500 } }); highlight(id); showNode(id); } }, S.view === 'ontology' ? 0 : 900); }
+});
+$('#details').addEventListener('change', ev => {
+  const f = ev.target.closest('[data-f]'), box = f?.closest('[data-term]'); if (!box) return;
+  const v = f.value.trim();
+  setTerm(box.dataset.term, f.dataset.f === 'syn' ? { syn: [...new Set(v.split(/\s*[,|;]\s*/).filter(Boolean))] } : { desc: v });
+});
+$('#details').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-certify]'), box = b?.closest('[data-term]'); if (!box) return;
+  const key = box.dataset.term;
+  setTerm(key, { status: b.dataset.certify === '1' ? 'certified' : 'draft' });
+  const sel = network?.getSelectedNodes?.()[0], se = network?.getSelectedEdges?.()[0];
+  if (key.startsWith('C:') && sel === key) showNode(sel); else if (se) showEdge(se); else if (key.startsWith('C:')) showNode(key);
 });
 $('#legend').addEventListener('click', ev => { const t = ev.target.closest('.lg'); if (!t || !t.dataset.t) return; const k = t.dataset.t; S.hidden.has(k) ? S.hidden.delete(k) : S.hidden.add(k); render(); });
 
@@ -3669,7 +3714,7 @@ function download(name, text, type = 'text/plain') { const a = document.createEl
 const lbl = s => '`' + String(s).replace(/`/g, '``') + '`';
 const cyVal = v => typeof v === 'number' || typeof v === 'boolean' ? String(v) : Array.isArray(v) ? '[' + v.map(cyVal).join(', ') + ']' : JSON.stringify(String(v));
 const neoVal = v => Array.isArray(v) ? (v.every(x => typeof x === 'number') ? v : v.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x))) : (v && typeof v === 'object') ? JSON.stringify(v) : v;
-const TOOL_TAG = 'auto-ontology';
+const TOOL_TAG = 'graphloom', OLD_TAGS = ['graphloom', 'auto-ontology'];
 function nodeProps(e) {
   const t = typeOf(e), ts = e.typeSrc?.[t];
   const p = { uid: uidOf(e), name: e.name, class: t, mentions: e.mentions, sources: [...e.docs].sort(), _source: TOOL_TAG };
@@ -3692,12 +3737,12 @@ function exportGraph() { const v = S.viewData || computeView(); return v.full; }
 function toCypher() {
   const { ents, rels } = exportGraph(); const onto = buildOntology({ ents, rels });
   const classes = [...new Set(ents.map(typeOf))].sort();
-  const L = ['// Generated by graphLOOM (Auto-Ontology Explorer) — paste into Neo4j Browser or run with cypher-shell', '// Ontology: ' + [...onto.classes.keys()].join(', '),
-    '// Every node/relationship carries tier (explicit | inferred | co_occurrence), extractors, sources and _source = "auto-ontology".',
-    '// To start clean from an earlier import of this tool, first run:  MATCH (n:Entity {_source: "auto-ontology"}) DETACH DELETE n;', '',
+  const L = ['// Generated by graphLOOM (Ontology & Knowledge Graph Explorer) — paste into Neo4j Browser or run with cypher-shell', '// Ontology: ' + [...onto.classes.keys()].join(', '),
+    '// Every node/relationship carries tier (explicit | inferred | co_occurrence), extractors, sources and _source = "graphloom".',
+    '// To start clean from an earlier import of this tool, first run:  MATCH (n:Entity) WHERE n._source IN ["graphloom", "auto-ontology"] DETACH DELETE n;', '',
     'CREATE CONSTRAINT entity_uid IF NOT EXISTS FOR (n:Entity) REQUIRE n.uid IS UNIQUE;',
     `// re-runs: drop class labels set by an earlier run (a node's class may have changed)`,
-    classes.length ? `MATCH (n:Entity {_source: "auto-ontology"}) REMOVE n:${classes.map(lbl).join(':')};` : '', ''];
+    classes.length ? `MATCH (n:Entity) WHERE n._source IN ["graphloom", "auto-ontology"] REMOVE n:${classes.map(lbl).join(':')};` : '', ''];
   for (const e of ents) { const p = nodeProps(e); L.push(`MERGE (n:Entity {uid: ${cyVal(p.uid)}}) SET n = {${Object.entries(p).map(([k, v]) => lbl(k) + ': ' + cyVal(v)).join(', ')}}, n:${lbl(typeOf(e))};`); }
   L.push('');
   for (const r of rels) { const a = S.ents.get(r.from), b = S.ents.get(r.to); const p = relProps(r); L.push(`MATCH (a:Entity {uid: ${cyVal(uidOf(a))}}), (b:Entity {uid: ${cyVal(uidOf(b))}}) MERGE (a)-[r:${lbl(r.type)}]->(b) SET r = {${Object.entries(p).map(([k, v]) => lbl(k) + ': ' + cyVal(v)).join(', ')}};`); }
@@ -3710,9 +3755,10 @@ function toCypher() {
 }
 function toTurtle() {
   const { ents, rels } = exportGraph(); const onto = buildOntology({ ents, rels });
-  const L = ['@prefix : <http://example.org/onto#> .', '@prefix owl: <http://www.w3.org/2002/07/owl#> .', '@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .', '@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .', '', ': a owl:Ontology ; rdfs:label "Auto-induced ontology" .', ''];
+  const L = ['@prefix : <http://example.org/onto#> .', '@prefix owl: <http://www.w3.org/2002/07/owl#> .', '@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .', '@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .', '@prefix skos: <http://www.w3.org/2004/02/skos/core#> .', '@prefix vs: <http://www.w3.org/2003/06/sw-vocab-status/ns#> .', '', ': a owl:Ontology ; rdfs:label "Auto-induced ontology" .', ''];
+  const termTtl = x => `${x.synonyms?.length ? ' ; skos:altLabel ' + x.synonyms.map(s => JSON.stringify(s)).join(', ') : ''} ; vs:term_status ${x.status === 'certified' ? '"stable"' : '"testing"'}`;
   const parents = new Set();
-  for (const c of onto.classes.values()) { L.push(`:${pascal(c.name)} a owl:Class ; rdfs:label ${JSON.stringify(c.name)}${c.desc ? ' ; rdfs:comment ' + JSON.stringify(c.desc) : ''}${c.parent ? ' ; rdfs:subClassOf :' + pascal(c.parent) : ''} .`); if (c.parent) parents.add(c.parent); }
+  for (const c of onto.classes.values()) { L.push(`:${pascal(c.name)} a owl:Class ; rdfs:label ${JSON.stringify(c.name)}${c.desc ? ' ; rdfs:comment ' + JSON.stringify(c.desc) : ''}${c.parent ? ' ; rdfs:subClassOf :' + pascal(c.parent) : ''}${termTtl(c)} .`); if (c.parent) parents.add(c.parent); }
   for (const p of parents) if (!onto.classes.has(p)) L.push(`:${pascal(p)} a owl:Class ; rdfs:label ${JSON.stringify(p)} .`);
   L.push('');
   const byType = new Map(); for (const r of onto.rels) { if (!byType.has(r.type)) byType.set(r.type, []); byType.get(r.type).push(r); }
@@ -3722,7 +3768,7 @@ function toTurtle() {
   for (const [t, arr] of byType) {
     const dm = dominant.get(t);
     const doms = dm?.domain ? [dm.domain] : [...new Set(arr.map(r => r.domain))], rngs = dm?.range ? [dm.range] : [...new Set(arr.map(r => r.range))];
-    L.push(`:${camel(t.toLowerCase())} a owl:ObjectProperty${SYMMETRIC.has(t) ? ' , owl:SymmetricProperty' : ''} ; rdfs:label ${JSON.stringify(t)} ; rdfs:domain ${set(doms)} ; rdfs:range ${set(rngs)} .`);
+    L.push(`:${camel(t.toLowerCase())} a owl:ObjectProperty${SYMMETRIC.has(t) ? ' , owl:SymmetricProperty' : ''} ; rdfs:label ${JSON.stringify(t)}${arr.find(r => r.desc)?.desc ? ' ; rdfs:comment ' + JSON.stringify(arr.find(r => r.desc).desc) : ''} ; rdfs:domain ${set(doms)} ; rdfs:range ${set(rngs)}${termTtl(arr[0])} .`);
     if (dm?.domain) shapes.push(`:${pascal(t.toLowerCase())}DomainShape a sh:NodeShape ; sh:targetSubjectsOf :${camel(t.toLowerCase())} ; sh:class :${pascal(dm.domain)} .`);
     if (dm?.range) shapes.push(`:${pascal(t.toLowerCase())}RangeShape a sh:NodeShape ; sh:targetObjectsOf :${camel(t.toLowerCase())} ; sh:class :${pascal(dm.range)} .`);
   }
@@ -3736,7 +3782,7 @@ function toJSON() {
   const { ents, rels } = exportGraph(); const onto = buildOntology({ ents, rels });
   return JSON.stringify({
     generated: new Date().toISOString(), engine: S.engineUsed, diagnostics: computeDiagnostics(),
-    ontology: { classes: [...onto.classes.values()].map(c => ({ name: c.name, parent: c.parent, description: c.desc, instances: c.count, declared: !!c.declared, properties: [...c.props.keys()] })), relationshipTypes: onto.rels.map(r => ({ type: r.type, domain: r.domain, range: r.range, count: r.count, declared: !!r.declared })) },
+    ontology: { classes: [...onto.classes.values()].map(c => ({ name: c.name, parent: c.parent, description: c.desc, synonyms: c.synonyms, term_status: c.status, instances: c.count, declared: !!c.declared, properties: [...c.props.keys()] })), relationshipTypes: onto.rels.map(r => ({ type: r.type, domain: r.domain, range: r.range, count: r.count, declared: !!r.declared, description: r.desc || '', synonyms: r.synonyms, term_status: r.status })) },
     nodes: ents.map(e => ({ uid: uidOf(e), labels: ['Entity', typeOf(e)], properties: nodeProps(e) })),
     relationships: rels.map(r => ({ from: uidOf(S.ents.get(r.from)), to: uidOf(S.ents.get(r.to)), type: r.type, tier: r.tier, extractors: [...(r.extractors || [])], properties: relProps(r) }))
   }, null, 2);
@@ -3746,6 +3792,92 @@ function toCSV() {
   const pv = v => Array.isArray(v) ? v.join(' | ') : v;
   return ['subject_uid,subject,subject_type,predicate,object_uid,object,object_type,tier,extractors,weight,qualifier,sources,evidence'].concat(rels.map(r => { const a = S.ents.get(r.from), b = S.ents.get(r.to); return [uidOf(a), a.name, typeOf(a), r.type, uidOf(b), b.name, typeOf(b), r.tier, [...(r.extractors || [])].join(' | '), r.weight, pv(r.props?.qualifier ?? ''), [...(r.docs || [])].join(' | '), (r.evidence || []).map(ev => ev.text).join(' || ')].map(q).join(','); })).join('\n');
 }
+const OSSIE_VERSION = '0.3.0.dev0';
+const snakeId = s => String(s).replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase().replace(/^(\d)/, '_$1') || 'x';
+const yq = s => JSON.stringify(String(s).replace(/[\u2028\u2029]/g, ' ').replace(/[\x7f-\x9f]/g, ''));
+const yScalar = v => v == null ? 'null' : typeof v === 'number' ? (Number.isFinite(v) ? String(v) : 'null') : typeof v === 'boolean' ? String(v) : yq(v);
+function yamlLines(obj, pad = '') {
+  const out = [];
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined || (Array.isArray(v) && !v.length)) continue;
+    if (Array.isArray(v)) {
+      if (v.every(x => x == null || typeof x !== 'object')) { out.push(`${pad}${k}: [${v.map(yScalar).join(', ')}]`); continue; }
+      out.push(`${pad}${k}:`);
+      for (const it of v) { const sub = yamlLines(it, pad + '    '); if (!sub.length) { out.push(`${pad}  - {}`); continue; } sub[0] = `${pad}  - ` + sub[0].slice(pad.length + 4); out.push(...sub); }
+    } else if (v && typeof v === 'object') { const sub = yamlLines(v, pad + '  '); out.push(sub.length ? `${pad}${k}:` : `${pad}${k}: {}`, ...sub); }
+    else out.push(`${pad}${k}: ${yScalar(v)}`);
+  }
+  return out;
+}
+function ossieType(vals) {
+  const xs = vals.filter(v => v != null && v !== ''); if (!xs.length) return undefined;
+  if (xs.some(Array.isArray)) return 'String';
+  if (xs.every(v => typeof v === 'boolean')) return 'Boolean';
+  if (xs.every(v => typeof v === 'number')) return xs.every(Number.isInteger) ? 'Integer' : 'Decimal';
+  if (xs.every(v => /^\d{4}-\d{2}-\d{2}$/.test(String(v)))) return 'Date';
+  return 'String';
+}
+function buildOssie() {
+  const { ents: all, rels: allRels } = exportGraph();
+  const ents = all.filter(e => !e.isDoc), ids = new Set(ents.map(e => e.id));
+  const rels = allRels.filter(r => !WEAK.has(r.type) && r.tier !== 'co_occurrence' && ids.has(r.from) && ids.has(r.to));
+  const onto = buildOntology({ ents, rels }), tOf = new Map(ents.map(e => [e.id, typeOf(e)]));
+  const usedDs = new Set(), usedRel = new Set();
+  const uniq = (set, base) => { let n = base, k = 2; while (set.has(n)) n = `${base}_${k++}`; set.add(n); return n; };
+  const ext = data => [{ vendor_name: 'graphLOOM', data }];
+  const dsOf = new Map(), fieldsOf = new Map(), datasets = [], relationships = [];
+  const classes = [...onto.classes.values()].filter(c => c.name !== 'SourceFile').sort((a, b) => b.count - a.count || (a.name < b.name ? -1 : 1));
+  for (const c of classes) {
+    const name = uniq(usedDs, snakeId(c.name)), members = ents.filter(e => tOf.get(e.id) === c.name), fset = new Set(['name']);
+    const fields = [{ name: 'name', expression: { sql: 'name' }, datatype: 'String', description: `Canonical name of the ${c.name}` }];
+    for (const [k, n] of [...c.props.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40)) {
+      const f = snakeId(k); if (fset.has(f)) continue; fset.add(f);
+      fields.push({ name: f, expression: { sql: f }, datatype: ossieType(members.map(e => e.props[k])), description: `${k} (present on ${Math.round(100 * n / Math.max(1, c.count))}% of instances)` });
+    }
+    const d = { name, source: `graphloom.${name}`, primary_key: ['name'], description: c.desc || undefined, ai_context: c.synonyms.length ? { synonyms: c.synonyms } : undefined, fields,
+      nonportable_extensions: ext({ class: c.name, parent: c.parent || null, instances: c.count, term_status: c.status, origin: c.declared ? 'declared' : 'induced', sample_instances: c.examples.slice(0, 5).map(id => S.ents.get(id)?.name).filter(Boolean) }) };
+    dsOf.set(c.name, name); fieldsOf.set(name, fset); datasets.push(d);
+  }
+  const groups = new Map();
+  for (const r of rels) {
+    let a = tOf.get(r.from), b = tOf.get(r.to), from = r.from, to = r.to;
+    if (!dsOf.has(a) || !dsOf.has(b)) continue;
+    if (SYMMETRIC.has(r.type) && a > b) { [a, b] = [b, a]; [from, to] = [to, from]; }
+    const k = a + '|' + r.type + '|' + b;
+    if (!groups.has(k)) groups.set(k, { domain: a, type: r.type, range: b, rels: [], per: new Map() });
+    const g = groups.get(k); g.rels.push(r); if (!g.per.has(from)) g.per.set(from, new Set()); g.per.get(from).add(to);
+  }
+  const ontoRel = new Map(onto.rels.map(x => [x.domain + '|' + x.type + '|' + x.range, x]));
+  for (const g of [...groups.values()].sort((x, y) => y.rels.length - x.rels.length)) {
+    const o = ontoRel.get(g.domain + '|' + g.type + '|' + g.range) || termFields('R', g.type, '');
+    const dD = dsOf.get(g.domain), dR = dsOf.get(g.range), verb = g.type.toLowerCase().replace(/_/g, ' ');
+    const manyToOne = !SYMMETRIC.has(g.type) && [...g.per.values()].every(s => s.size <= 1);
+    const evidence = {}; for (const r of g.rels) evidence[r.tier || 'inferred'] = (evidence[r.tier || 'inferred'] || 0) + 1;
+    const data = { relationship_type: g.type, domain: g.domain, range: g.range, links: g.rels.length, cardinality: manyToOne ? 'many_to_one' : 'many_to_many', evidence, term_status: o.status };
+    const ai = o.desc || o.synonyms?.length ? { instructions: o.desc || undefined, synonyms: o.synonyms?.length ? o.synonyms : undefined } : undefined;
+    if (manyToOne) {
+      const fset = fieldsOf.get(dD), f = uniq(fset, `${snakeId(g.type)}_${snakeId(g.range)}`);
+      datasets.find(d => d.name === dD).fields.push({ name: f, expression: { sql: f }, datatype: 'String', description: `Name of the ${g.range} this ${g.domain} ${verb}` });
+      relationships.push({ name: uniq(usedRel, `${dD}_${snakeId(g.type)}_${dR}`), from: dD, to: dR, from_columns: [f], to_columns: ['name'], ai_context: ai, nonportable_extensions: ext(data) });
+    } else {
+      const bn = uniq(usedDs, `${dD}_${snakeId(g.type)}_${dR}`), same = dD === dR;
+      const fa = same ? `from_${dD}_name` : `${dD}_name`, fb = same ? `to_${dR}_name` : `${dR}_name`;
+      datasets.push({ name: bn, source: `graphloom.${bn}`, primary_key: [fa, fb], description: `Links each ${g.domain} to the ${g.range}(s) it ${verb} (many-to-many).`, ai_context: ai,
+        fields: [{ name: fa, expression: { sql: fa }, datatype: 'String', description: `Name of the ${g.domain}` }, { name: fb, expression: { sql: fb }, datatype: 'String', description: `Name of the ${g.range}` }], nonportable_extensions: ext(data) });
+      fieldsOf.set(bn, new Set([fa, fb]));
+      relationships.push({ name: uniq(usedRel, `${bn}_from`), from: bn, to: dD, from_columns: [fa], to_columns: ['name'], nonportable_extensions: ext({ relationship_type: g.type, role: 'subject' }) });
+      relationships.push({ name: uniq(usedRel, `${bn}_to`), from: bn, to: dR, from_columns: [fb], to_columns: ['name'], nonportable_extensions: ext({ relationship_type: g.type, role: 'object' }) });
+    }
+  }
+  const files = S.docs.filter(d => !d.skip && !d.err).map(d => d.path);
+  return {
+    version: OSSIE_VERSION, name: 'graphloom_model', description: `Ontology induced by graphLOOM from ${files.length} source file(s).`,
+    ai_context: { instructions: 'Logical model induced from documents and data files. Each dataset is an entity class keyed by name; link fields hold the related entity’s name, and many-to-many relationships use bridge datasets. Sources named graphloom.* are placeholders: point them at real tables or views before running SQL.' },
+    datasets, relationships,
+    nonportable_extensions: ext({ generated: new Date().toISOString(), sources: files.slice(0, 200), certified_terms: classes.filter(c => c.status === 'certified').length + new Set(onto.rels.filter(r => r.status === 'certified').map(r => r.type)).size })
+  };
+}
+function toOssie() { return [`# Apache Ossie semantic model (spec ${OSSIE_VERSION}), generated by graphLOOM`, ...yamlLines(buildOssie()), ''].join('\n'); }
 function toPNG() {
   const src = $('#graph canvas'); if (!src) return;
   const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
@@ -3766,7 +3898,7 @@ async function pushNeo4j() {
     const { ents, rels } = exportGraph();
     say('Creating constraint…');
     await tx([{ statement: 'CREATE CONSTRAINT entity_uid IF NOT EXISTS FOR (n:Entity) REQUIRE n.uid IS UNIQUE' }]);
-    if ($('#neoReplace').checked) { await tx([{ statement: `MATCH (n:Entity {_source: $tag}) DETACH DELETE n`, parameters: { tag: TOOL_TAG } }]); say('✓ removed nodes from earlier pushes of this tool'); }
+    if ($('#neoReplace').checked) { await tx([{ statement: `MATCH (n:Entity) WHERE n._source IN $tags DETACH DELETE n`, parameters: { tags: OLD_TAGS } }]); say('✓ removed nodes from earlier pushes of this tool'); }
     const uids = ents.map(uidOf);
     const lj = await tx([{ statement: 'CALL db.labels()' }]);
     const old = (lj.results?.[0]?.data || []).map(x => x.row[0]).filter(l => l !== 'Entity' && l !== 'OntologyClass');
@@ -3777,14 +3909,14 @@ async function pushNeo4j() {
     const keep = rels.map(r => uidOf(S.ents.get(r.from)) + '|' + r.type + '|' + uidOf(S.ents.get(r.to)));
     const byR = new Map(); rels.forEach(r => { if (!byR.has(r.type)) byR.set(r.type, []); byR.get(r.type).push({ from: uidOf(S.ents.get(r.from)), to: uidOf(S.ents.get(r.to)), props: relProps(r) }); });
     for (const [t, rows] of byR) for (let i = 0; i < rows.length; i += 500) { await tx([{ statement: `UNWIND $rows AS row MATCH (a:Entity {uid: row.from}) MATCH (b:Entity {uid: row.to}) MERGE (a)-[r:${lbl(t)}]->(b) SET r = row.props`, parameters: { rows: rows.slice(i, i + 500) } }]); }
-    const st = await tx([{ statement: `MATCH (a:Entity)-[r]->(b:Entity) WHERE r._source = $tag AND a.uid IN $uids AND b.uid IN $uids AND NOT (a.uid + '|' + type(r) + '|' + b.uid) IN $keep DELETE r RETURN count(*)`, parameters: { tag: TOOL_TAG, uids, keep } }]);
+    const st = await tx([{ statement: `MATCH (a:Entity)-[r]->(b:Entity) WHERE r._source IN $tags AND a.uid IN $uids AND b.uid IN $uids AND NOT (a.uid + '|' + type(r) + '|' + b.uid) IN $keep DELETE r RETURN count(*)`, parameters: { tags: OLD_TAGS, uids, keep } }]);
     const stale = st.results?.[0]?.data?.[0]?.row?.[0] || 0;
     say(`✓ ${rels.length} relationships${stale ? ` · ${stale} stale relationship(s) from earlier pushes removed` : ''}`, 'ok');
     say('Done. In Neo4j Browser run: CALL db.schema.visualization()');
   } catch (e) { say('✗ ' + e.message + (/fetch/i.test(e.message) ? ' — is Neo4j running and reachable from this page?' : ''), 'e'); }
 }
 
-const WB_MARK = 'auto-ontology-workbook v1';
+const WB_MARK = 'graphloom-workbook v1';
 const XL_MAX = 32000;
 const xlCell = v => v == null ? '' : Array.isArray(v) ? trunc(v.map(String).join(' | '), XL_MAX) : typeof v === 'object' ? trunc(JSON.stringify(v), XL_MAX) : typeof v === 'string' ? trunc(v, XL_MAX) : v;
 const ENT_META = ['UID', 'Name', 'Class', 'Class_Tier', 'Class_From', 'Mentions', 'Degree', 'Aliases', 'Sources', 'Extractors', 'Merged_From', 'Merge_Into_UID', 'Review_Status'];
@@ -3798,7 +3930,7 @@ function buildWorkbook() {
   const S1 = [
     ['Workbook format', WB_MARK, 'Keep this row — it lets the app recognise this workbook when you load it back'],
     ['Generated', new Date().toISOString(), ''],
-    ['Engine', S.engineUsed === 'llm' ? 'NVIDIA NIM (LLM)' : 'Built-in auto-ontology', ''],
+    ['Engine', S.engineUsed === 'llm' ? 'NVIDIA NIM (LLM)' : 'Built-in extractor', ''],
     ['Source files', S.docs.filter(d => !d.skip && !d.err && !d.kgWorkbook).map(d => d.path).join(' | ') || '(reviewed workbook)', ''],
     ['Entities', ents.length, 'current view filters apply (hidden classes, min mentions, links shown)'],
     ['Relationships', rels.length, ''],
@@ -3813,6 +3945,7 @@ function buildWorkbook() {
     ['Isolated entities', ents.filter(e => !deg.get(e.id)).length, 'no relationships in this export'],
     ['Classes', onto.classes.size, ''],
     ['Relationship types', new Set(onto.rels.map(r => r.type)).size, ''],
+    ['Certified terms', [...onto.classes.values()].filter(c => c.status === 'certified').length + new Set(onto.rels.filter(r => r.status === 'certified').map(r => r.type)).size, 'classes and relationship types an expert has reviewed'],
     ...(g.declared ? [['Declared classes · relations', `${g.declared.classes} · ${g.declared.relations}`, 'schema stated by the documents'], ['Links using declared names %', g.declared.relationships_using_declared_names_pct, '']] : []),
     ['Merges', Object.entries(g.merges).map(([k, v]) => `${k}: ${v}`).join('; ') || 0, 'see Entities → Merged_From'],
     ['Homonyms kept apart', g.homonyms, ''], ['UID collisions resolved', g.uid_collisions, ''],
@@ -3823,13 +3956,15 @@ function buildWorkbook() {
     ['Entities → Class', 'edit the class', 'The edited class is treated as stated (explicit)'],
     ['Entities → Merge_Into_UID', 'another entity’s UID', 'Merges this entity into that one'],
     ['Entities → Review_Status', 'REJECTED', 'Removes the entity and its links'],
-    ['Ontology_Classes → Parent_Class', 'edit the parent', 'Changes the class hierarchy']
+    ['Ontology_Classes → Parent_Class', 'edit the parent', 'Changes the class hierarchy'],
+    ['Ontology_Classes / Ontology_Relations → Term_Status', 'CERTIFIED / DRAFT', 'Marks a class or relationship type as reviewed by an expert'],
+    ['Ontology_Classes / Ontology_Relations → Description, Synonyms', 'edit the text (synonyms separated by | )', 'Kept as the term’s definition; exported to JSON, Turtle and Ossie']
   ].map(([Metric, Value, Notes]) => ({ Metric, Value, Notes }));
   sheets.push({ name: 'Summary', rows: S1, header: ['Metric', 'Value', 'Notes'] });
-  sheets.push({ name: 'Ontology_Classes', header: ['Class', 'Parent_Class', 'Description', 'Instance_Count', 'Neo4j_Label', 'Source_Type', 'Abbreviation'],
-    rows: [...onto.classes.values()].sort((a, b) => b.count - a.count || (a.name < b.name ? -1 : 1)).map(c => ({ Class: c.name, Parent_Class: c.parent || '', Description: c.desc || '', Instance_Count: c.count, Neo4j_Label: ':' + c.name, Source_Type: c.declared ? 'declared' : S.llm?.classes?.[c.name] ? 'llm' : 'induced', Abbreviation: c.abbr || '' })) });
-  sheets.push({ name: 'Ontology_Relations', header: ['Relation_Type', 'Domain_Class', 'Range_Class', 'Instance_Count', 'Symmetric', 'Declared', 'Description'],
-    rows: onto.rels.sort((a, b) => b.count - a.count).map(r => ({ Relation_Type: r.type, Domain_Class: r.domain, Range_Class: r.range, Instance_Count: r.count, Symmetric: SYMMETRIC.has(r.type) ? 'Yes' : 'No', Declared: r.declared ? 'Yes' : 'No', Description: r.desc || '' })) });
+  sheets.push({ name: 'Ontology_Classes', header: ['Class', 'Parent_Class', 'Description', 'Synonyms', 'Term_Status', 'Instance_Count', 'Neo4j_Label', 'Source_Type', 'Abbreviation'],
+    rows: [...onto.classes.values()].sort((a, b) => b.count - a.count || (a.name < b.name ? -1 : 1)).map(c => ({ Class: c.name, Parent_Class: c.parent || '', Description: c.desc || '', Synonyms: c.synonyms.join(' | '), Term_Status: c.status.toUpperCase(), Instance_Count: c.count, Neo4j_Label: ':' + c.name, Source_Type: c.declared ? 'declared' : S.llm?.classes?.[c.name] ? 'llm' : 'induced', Abbreviation: c.abbr || '' })) });
+  sheets.push({ name: 'Ontology_Relations', header: ['Relation_Type', 'Domain_Class', 'Range_Class', 'Instance_Count', 'Symmetric', 'Declared', 'Description', 'Synonyms', 'Term_Status'],
+    rows: onto.rels.sort((a, b) => b.count - a.count).map(r => ({ Relation_Type: r.type, Domain_Class: r.domain, Range_Class: r.range, Instance_Count: r.count, Symmetric: SYMMETRIC.has(r.type) ? 'Yes' : 'No', Declared: r.declared ? 'Yes' : 'No', Description: r.desc || '', Synonyms: r.synonyms.join(' | '), Term_Status: r.status.toUpperCase() })) });
   const pf = new Map(); ents.forEach(e => Object.keys(e.props).forEach(k => pf.set(k, (pf.get(k) || 0) + 1)));
   const propCols = [...pf.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 80).map(x => x[0]);
   const colOf = k => ENT_META.some(m => m.toLowerCase() === k.toLowerCase()) ? 'prop_' + k : k;
@@ -3876,7 +4011,7 @@ function readKgWorkbook(wb) {
   if (!wb.SheetNames.includes('Entities') || !wb.SheetNames.includes('Relationships')) return null;
   const rows = n => wb.Sheets[n] ? XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '' }) : [];
   const entities = rows('Entities'), relationships = rows('Relationships');
-  const marked = rows('Summary').some(r => String(r.Value || '').startsWith('auto-ontology-workbook'));
+  const marked = rows('Summary').some(r => /^(graphloom|auto-ontology)-workbook/.test(String(r.Value || '')));
   if (!marked && !(entities[0] && 'UID' in entities[0] && relationships[0] && 'Subject_UID' in relationships[0])) return null;
   return { entities, relationships, classes: rows('Ontology_Classes'), relations: rows('Ontology_Relations') };
 }
@@ -3893,6 +4028,16 @@ function importWorkbook(d) {
       if (c.Parent_Class) dc.parent = String(c.Parent_Class).trim(); if (c.Description && !dc.description) dc.description = String(c.Description); if (c.Abbreviation) dc.abbr = String(c.Abbreviation);
     }
   }
+  const importTerm = (kind, n, row, base) => {
+    const k = kind + ':' + n; if (!n || S.terms.has(k)) return;
+    const status = /^\s*certified\s*$/i.test(String(row.Term_Status ?? '')) ? 'certified' : 'draft';
+    const auto = kind === 'C' ? new Set([...(SYN_OF[n] || []), String(row.Abbreviation || '')]) : new Set();
+    const syn = String(row.Synonyms ?? '').split(/\s*[|,;]\s*/).map(x => x.trim()).filter(x => x && !auto.has(x));
+    const desc = String(row.Description ?? '').trim(), keepDesc = desc && desc !== base && !/^declared: “/.test(desc) ? desc : '';
+    if (status === 'certified' || syn.length || keepDesc) S.terms.set(k, { desc: keepDesc, syn, status });
+  };
+  for (const c of W.classes || []) { const n = String(c.Class || '').trim(); importTerm('C', n, c, S.llm?.classes?.[n]?.description || S.declared?.classes?.[n]?.description || DEFAULT_DESC[n] || ''); }
+  for (const r of W.relations || []) if (r.Relation_Type) importTerm('R', upperSnake(r.Relation_Type), r, '');
   for (const r of W.relations || []) if (r.Declared === 'Yes' && r.Relation_Type) { S.declared ||= { classes: {}, relations: [] }; const name = upperSnake(r.Relation_Type); if (!S.declared.relations.some(x => x.name === name && x.domain === r.Domain_Class)) S.declared.relations.push({ name, verb: camel(name.toLowerCase()), domain: r.Domain_Class, range: r.Range_Class || null, evidence: 'reviewed workbook', doc: d.name }); }
   let nE = 0, nR = 0, nRej = 0, nMerge = 0;
   for (const row of W.entities) {
@@ -4124,8 +4269,8 @@ async function runSelfTest() {
   const orgScore = () => { const rt = RELS().filter(r => r.type === 'REPORTS_TO').map(r => [S.ents.get(R(r.from)).name, S.ents.get(R(r.to)).name]); return { ok: T_ORG.filter(([c, p]) => rt.some(x => x[0] === c && x[1] === p)).length, wrong: rt.filter(x => !T_ORG.some(([c, p]) => x[0] === c && x[1] === p)).length }; };
   const load = async files => { S.docs = []; for (const [p, t] of Object.entries(files)) S.docs.push(await parseFile(new File([t], p.split('/').pop()), p)); await rebuild({ silent: true, engine: 'heur' }); };
   const provClean = () => RELS().every(r => r.tier && r.extractors && r.extractors.size && !r.extractors.has('unknown')) && S.diag.unknownProv === 0;
-  const saved = S.docs, savedView = S.view, savedDecisions = S.dupDecisions;
-  S.quiet = true; S.dupDecisions = new Map();
+  const saved = S.docs, savedView = S.view, savedDecisions = S.dupDecisions, savedTerms = S.terms;
+  S.quiet = true; S.dupDecisions = new Map(); S.terms = new Map();
   try {
     group = 'Sample corpus'; await load(SAMPLE);
     ok('≥ 45 typed relationships', RELS().filter(r => r.tier !== 'co_occurrence').length >= 45, RELS().filter(r => r.tier !== 'co_occurrence').length);
@@ -4394,16 +4539,32 @@ async function runSelfTest() {
     ok('relationship export has tier + extractors', acq && relProps(acq).tier === 'explicit' && relProps(acq).extractors.includes('text_rule'));
     S.viewData = computeView();
     const cy = toCypher();
-    ok('Cypher replaces property maps and tags _source', /SET n = \{/.test(cy) && /`_source`: "auto-ontology"/.test(cy));
+    ok('Cypher replaces property maps and tags _source', /SET n = \{/.test(cy) && /`_source`: "graphloom"/.test(cy));
     ok('Cypher strips stale class labels on re-run', /REMOVE n:/.test(cy));
     const j = JSON.parse(toJSON());
     ok('JSON uses stable uids and carries diagnostics', j.nodes.every(n => n.uid) && j.diagnostics && j.relationships.every(r => r.tier));
+
+    group = 'Terms & Ossie export';
+    let ox = buildOssie(); const dsByName = new Map(ox.datasets.map(d => [d.name, d]));
+    ok('Ossie root has version, name and datasets', ox.version === OSSIE_VERSION && !!ox.name && ox.datasets.length > 0, ox.datasets.length);
+    ok('datasets: source, key fields exist, field names unique', ox.datasets.every(d => d.source && d.primary_key.every(k => d.fields.some(f => f.name === k)) && new Set(d.fields.map(f => f.name)).size === d.fields.length));
+    ok('relationships reference real datasets and fields', ox.relationships.length > 0 && ox.relationships.every(r => dsByName.has(r.from) && dsByName.has(r.to) && r.from_columns.length === r.to_columns.length && r.from_columns.every(c => dsByName.get(r.from).fields.some(f => f.name === c)) && r.to_columns.every(c => dsByName.get(r.to).fields.some(f => f.name === c))), ox.relationships.length);
+    ok('dataset and relationship names unique', dsByName.size === ox.datasets.length && new Set(ox.relationships.map(r => r.name)).size === ox.relationships.length);
+    ok('co-occurrence links left out', !ox.relationships.some(r => r.nonportable_extensions[0].data.relationship_type === 'RELATED_TO'));
+    ok('YAML is block style with quoted scalars', /^version: "0\.3\.0\.dev0"$/m.test(toOssie()) && /^datasets:$/m.test(toOssie()) && /^  - name: "/m.test(toOssie()));
+    const tc = ox.datasets[0].nonportable_extensions[0].data.class;
+    S.terms.set('C:' + tc, { desc: 'Reviewed definition', syn: ['zz-alias'], status: 'certified' });
+    ox = buildOssie(); const td = ox.datasets.find(d => d.nonportable_extensions[0].data.class === tc);
+    ok('certified term reaches Ossie (description, synonyms, status)', td.description === 'Reviewed definition' && td.ai_context?.synonyms?.includes('zz-alias') && td.nonportable_extensions[0].data.term_status === 'certified');
+    ok('certified term reaches Turtle and JSON', /skos:altLabel "zz-alias"/.test(toTurtle()) && /vs:term_status "stable"/.test(toTurtle()) && JSON.parse(toJSON()).ontology.classes.find(c => c.name === tc)?.term_status === 'certified');
+    S.terms = new Map();
 
     group = 'Excel round-trip';
     await loadLib('xlsx');
     await load(FIXTURES.orgMarkdown); S.viewData = computeView();
     const before = { jerry: uidOf(E('Jerry Daniels')), works: relOf('Jerry Daniels', 'WORKS_FOR', 'Polaris')?.tier };
-    const wb = buildWorkbook();
+    S.terms.set('C:Person', { desc: 'Someone in the org chart', syn: ['employee', 'staff'], status: 'certified' });
+    const wb = buildWorkbook(); S.terms = new Map();
     ok('tabs: Summary, Ontology_Classes, Ontology_Relations, Entities, Relationships, Class_Person', ['Summary', 'Ontology_Classes', 'Ontology_Relations', 'Entities', 'Relationships', 'Class_Person'].every(n => wb.SheetNames.includes(n)), wb.SheetNames.join(', '));
     const js = n => XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '' });
     const entRows = js('Entities'), relRows = js('Relationships');
@@ -4427,6 +4588,8 @@ async function runSelfTest() {
     ok('other link tiers preserved', relOf('Jerry Daniels', 'WORKS_FOR', 'Polaris')?.tier === before.works, relOf('Jerry Daniels', 'WORKS_FOR', 'Polaris')?.tier + ' vs ' + before.works);
     ok('evidence carried through', RELS().some(r => r.evidence.length));
     ok('provenance complete after re-import', provClean(), S.diag.unknownProv);
+    ok('certified term, synonyms and description survive the round trip', S.terms.get('C:Person')?.status === 'certified' && ['employee', 'staff'].every(x => S.terms.get('C:Person').syn.includes(x)) && S.terms.get('C:Person').desc === 'Someone in the org chart', JSON.stringify(S.terms.get('C:Person')));
+    S.terms = new Map();
 
     group = 'Routing';
     await load({ 'r/only-table.md': FIXTURES.orgMarkdown['org/llm-output.md'], 'r/prose.txt': FIXTURES.orgText1['org/v1.txt'] });
@@ -4439,7 +4602,7 @@ async function runSelfTest() {
     ok('stated class beats LLM votes', typeOf(at) === 'Project', typeOf(at));
   } catch (e) { ok('runner', false, e.message + ' ' + (e.stack || '').split('\n')[1]); }
   S.quiet = false;
-  S.docs = saved; S._testing = false; S.dupDecisions = savedDecisions;
+  S.docs = saved; S._testing = false; S.dupDecisions = savedDecisions; S.terms = savedTerms;
   if (saved.length) { await rebuild(); if (savedView !== S.view) setView(savedView); }
   else { resetStore(); S.viewData = null; if (network) { nodesDS.clear(); edgesDS.clear(); } $('#diag').textContent = 'Load files to see extraction quality.'; }
   const passed = results.filter(r => r.pass).length;
@@ -4493,7 +4656,7 @@ function saveSession() {
   saveT = setTimeout(async () => {
     if (S._testing || S._restoring || !S.docs.length || typeof indexedDB === 'undefined') return;
     const docs = S.docs.map(d => { const o = {}; for (const [k, v] of Object.entries(d)) if (!k.startsWith('_') && typeof v !== 'function') o[k] = v; return o; });
-    const rec = { build: APP_BUILD, savedAt: Date.now(), docs, layout: S.layout, view: S.view, pos: S._pos ? [...S._pos] : [], decisions: S.dupDecisions ? [...S.dupDecisions] : [] };
+    const rec = { build: APP_BUILD, savedAt: Date.now(), docs, layout: S.layout, view: S.view, pos: S._pos ? [...S._pos] : [], decisions: S.dupDecisions ? [...S.dupDecisions] : [], terms: S.terms ? [...S.terms] : [] };
     try { await idbPut('last', rec); }
     catch (e) {
       try { await idbPut('last', { ...rec, docs: docs.map(d => ({ ...d, images: undefined, imgLayout: undefined })) }); log('  session saved without page images (browser storage is full)', 'w'); }
@@ -4510,6 +4673,7 @@ async function restoreSession() {
     if (s.layout) { S.layout = s.layout; $('#tLayout').textContent = 'Layout: ' + (S.layout === 'force' ? 'force' : 'hierarchy'); }
     if (s.view) { S.view = s.view; $('#vOnto').classList.toggle('on', S.view === 'ontology'); $('#vKG').classList.toggle('on', S.view === 'kg'); }
     if (s.decisions) S.dupDecisions = new Map(s.decisions);
+    if (Array.isArray(s.terms)) S.terms = new Map(s.terms);
     renderFiles(); log(`Restored your last session: ${s.docs.length} file(s), saved ${new Date(s.savedAt).toLocaleString()}`, 'ok');
     await rebuild({ positions: s.build === APP_BUILD ? s.pos : null });
     if (S.viewData) { setPanels({ left: false, right: false }); setTimeout(() => network && network.fit({ animation: { duration: 450 } }), 420); toast(`Restored your last session (${s.docs.length} file${s.docs.length > 1 ? 's' : ''}) — <b>Clear</b> in settings starts fresh`, 4500); }
@@ -4542,7 +4706,7 @@ document.addEventListener('drop', async e => {
   for (const it of items) await walk(it, '');
   ingest(out);
 });
-$('#clearBtn').onclick = () => { clearTimeout(saveT); S.dupDecisions = new Map(); try { idbDel('last').catch(() => { }); } catch (e) { } setPanels({ left: true, right: false }); $('#diag').textContent = 'Load files to see extraction quality.'; S.docs = []; resetStore(); S.viewData = null; renderFiles(); if (network) { nodesDS.clear(); edgesDS.clear(); } $('#empty').style.display = 'flex'; ['#legend', '#stats', '#tools', '#badge', '#chip'].forEach(s => $(s).style.display = 'none'); $('#clearBtn').disabled = true; $('#rerun').disabled = true; showHelp(); step(-1); $('#log').dataset.init = ''; $('#log').textContent = 'Waiting for files…'; };
+$('#clearBtn').onclick = () => { clearTimeout(saveT); S.dupDecisions = new Map(); S.terms = new Map(); try { idbDel('last').catch(() => { }); } catch (e) { } setPanels({ left: true, right: false }); $('#diag').textContent = 'Load files to see extraction quality.'; S.docs = []; resetStore(); S.viewData = null; renderFiles(); if (network) { nodesDS.clear(); edgesDS.clear(); } $('#empty').style.display = 'flex'; ['#legend', '#stats', '#tools', '#badge', '#chip'].forEach(s => $(s).style.display = 'none'); $('#clearBtn').disabled = true; $('#rerun').disabled = true; showHelp(); step(-1); $('#log').dataset.init = ''; $('#log').textContent = 'Waiting for files…'; };
 $('#rerun').onclick = () => rebuild();
 $('#tglLeft').onclick = () => setPanels({ left: !panelOpen('left') });
 $('#closeDetails').onclick = () => { clearHighlight(); network && network.unselectAll(); showHelp(); };
@@ -4590,6 +4754,7 @@ $('#exportMenu').addEventListener('click', e => {
   else if (x === 'json') download('knowledge-graph.json', toJSON(), 'application/json');
   else if (x === 'ttl') download('ontology.ttl', toTurtle(), 'text/turtle');
   else if (x === 'csv') download('triples.csv', toCSV(), 'text/csv');
+  else if (x === 'ossie') download('semantic-model.ossie.yaml', toOssie(), 'application/yaml');
   else if (x === 'xlsx') toXLSX().catch(err => log('Excel export failed: ' + err.message, 'e'));
   else if (x === 'png') toPNG();
   else if (x === 'push') { $('#neoLog').textContent = ''; $('#neoDlg').showModal(); }
