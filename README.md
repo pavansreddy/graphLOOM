@@ -57,7 +57,7 @@ git clone https://github.com/pavansreddy/graphLOOM.git
 cd graphloom
 ```
 
-Then open `ontology-graph-explorer.html` in Chrome, Edge or Firefox — that's it.
+Then open `graphLOOM.html` in Chrome, Edge or Firefox — that's it.
 
 1. Click **Upload files**, **Choose folder**, or drag files onto the page (or try **Try sample**).
 2. Browse the **Ontology**, then switch to the **Knowledge Graph**.
