@@ -1,6 +1,6 @@
 ﻿<div align="center">
 
-# 🕸️ GraphLoom
+# 🕸️ graphLOOM
 
 **Drop in your files. Get an ontology and a knowledge graph — in a single HTML page.**
 
