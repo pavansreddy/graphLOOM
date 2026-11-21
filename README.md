@@ -26,7 +26,7 @@
 
 ## ✨ About
 
-**GraphLoom** weaves documents, spreadsheets and images into a typed **knowledge graph**, and shows you the
+**graphLOOM** weaves documents, spreadsheets and images into a typed **knowledge graph**, and shows you the
 **ontology** behind it — the classes and relationship types — before morphing into the actual entities.
 
 It is one self-contained HTML file. No install, no server, no account: open it, drop a folder, explore.
