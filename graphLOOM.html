@@ -556,6 +556,7 @@ const RULES = [
   [/\b(signed|agreement with|contract with|deal with|agreed)\b/, 'AGREEMENT_WITH'],
   [/\b(cites?|cited|references?|referenced|mentions?|mentioned)\b/, 'REFERENCES'],
   [/\b(regulat\w+|governs?|governed|audit\w*|certif\w+)\b/, 'REGULATES'],
+  [/\b(?:is|are|was|were|became|becomes|remains?|has been|have been)\s+(?:(?:a|an|the|one of the|among the)\s+)?(?:[a-z-]+\s+){0,2}?(?:customers?|clients?)\s+(?:of|for|at)\b/, 'HAS_CUSTOMER', true],
   [/\b(serves?|served|customers?|clients?)\b/, 'SERVES'],
   [/\b(replac\w+|succeed\w*|supersed\w+)\b/, 'REPLACES'],
   [/^\s*(is|was|are|were) (an?|the) (type|kind|form|class|example|instance) of\b|^\s*(is|was) an?\s*$/, 'IS_A']
@@ -2647,7 +2648,8 @@ async function heuristicExtract(textDocs) {
         m.id = e.id; addEvidence(e.evidence, d.name, s);
         if (m.role && !e.props.role) e.props.role = m.role;
         const cls = classFromDefinition(s.slice(m.end, m.end + 90));
-        if (cls) {
+        if (cls && AMBIG_ROLE.test(cls.toLowerCase())) { if (!e.props.role && looksLikePersonName(e.name) && typeOf(e) === 'Person') e.props.role = cls.toLowerCase(); }
+        else if (cls) {
           if (cls !== 'Person' && (looksLikePersonName(e.name) || typeOf(e) === 'Person') && /(er|or|ist|ian|ant|ent|eer|ee|man|woman|person|ate|ain|ess|ive|ic)$/i.test(cls)) { vote(e, 'Person', 2.5, P.definition); if (!e.props.role) e.props.role = cls.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase(); }
           else { vote(e, cls, 2.5, P.definition); if (!e.props.is_a) e.props.is_a = cls; }
         }
@@ -3302,7 +3304,7 @@ function initNetwork() {
     else if (id.startsWith('E:')) { S.focus = { kind: 'entity', value: id.slice(2) }; render(); }
   });
   let fitTimer;
-  network.on('stabilized', () => { clearTimeout(fitTimer); if (S.settling) freezeLayout(); });
+  network.on('stabilized', () => { clearTimeout(fitTimer); if (S.settling && Date.now() >= (S._settleMin || 0)) freezeLayout(); });
 }
 function edgeFont() { return { size: 10, color: css('--text-2'), strokeWidth: 4, strokeColor: css('--canvas'), align: 'middle', face: 'ui-monospace, Consolas, monospace' }; }
 function assignCurves(edges) {
@@ -3412,22 +3414,26 @@ function renderKG(seeds) {
   if (clu && !S.focus && S.communities?.length) { const n = clusterCommunities(); if (n && !S.quiet) toast(`${n} communities collapsed into clusters — <b>double-click</b> one to open it`, 4000); }
 }
 const UP_REL = /^(REPORTS_TO|PART_OF|SUBCLASS_OF|MEMBER_OF|WORKS_FOR|AFFILIATED_WITH|LOCATED_IN|IS_A|INSTANCE_OF|BELONGS_TO|CHILD_OF|SUBSIDIARY_OF|PUBLISHED_IN|PUBLISHED_BY)$/;
+const hierRank = t => /^(REPORTS_TO|SUBCLASS_OF|PART_OF|SUBSIDIARY_OF|CHILD_OF|IS_A|INSTANCE_OF)$/.test(t) ? 0 : /^(MEMBER_OF|WORKS_FOR|AFFILIATED_WITH|BELONGS_TO)$/.test(t) ? 1 : UP_REL.test(t) ? 2 : 3;
 function hierLevels(nodes, edges) {
-  const ids = nodes.map(n => n.id), adj = new Map(ids.map(i => [i, []])), indeg = new Map(ids.map(i => [i, 0]));
+  const ids = nodes.map(n => n.id), kids = new Map(ids.map(i => [i, new Set()])), pars = new Map(ids.map(i => [i, new Set()])), cand = [];
   for (const e of edges) {
     if (!e._t || WEAK.has(e._t)) continue;
     const [p, c] = UP_REL.test(e._t) ? [e.to, e.from] : [e.from, e.to];
-    if (!adj.has(p) || !adj.has(c) || p === c) continue;
-    adj.get(p).push(c); indeg.set(c, indeg.get(c) + 1);
+    if (!kids.has(p) || !kids.has(c) || p === c) continue;
+    cand.push([hierRank(e._t), p, c]);
   }
-  const level = new Map(), q = [];
-  const bfs = starts => { for (const s of starts) if (!level.has(s)) { level.set(s, 0); q.push(s); } while (q.length) { const u = q.shift(); for (const v of adj.get(u)) if (!level.has(v)) { level.set(v, level.get(u) + 1); q.push(v); } } };
-  const byOut = (a, b) => adj.get(b).length - adj.get(a).length || (a < b ? -1 : 1);
-  bfs(ids.filter(i => indeg.get(i) === 0 && adj.get(i).length).sort(byOut));
-  for (const i of [...ids].sort(byOut)) if (!level.has(i) && adj.get(i).length) bfs([i]);
-  for (let pass = 0; pass < 2; pass++) for (const e of edges) { const a = level.get(e.from), b = level.get(e.to); if (a != null && b == null && adj.has(e.to)) level.set(e.to, a + 1); else if (b != null && a == null && adj.has(e.from)) level.set(e.from, b + 1); }
-  const max = Math.max(0, ...level.values());
-  ids.forEach(i => { if (!level.has(i)) level.set(i, max + 1); });
+  cand.sort((a, b) => a[0] - b[0]);
+  const reaches = (from, to) => { const seen = new Set([from]), st = [from]; while (st.length) { const u = st.pop(); if (u === to) return true; for (const v of kids.get(u)) if (!seen.has(v)) { seen.add(v); st.push(v); } } return false; };
+  for (const [, p, c] of cand) { if (kids.get(p).has(c) || reaches(c, p)) continue; kids.get(p).add(c); pars.get(c).add(p); }
+  const level = new Map(), indeg = new Map(ids.map(i => [i, pars.get(i).size])), order = ids.filter(i => !indeg.get(i));
+  order.forEach(i => level.set(i, 0));
+  for (let k = 0; k < order.length; k++) { const u = order[k]; for (const v of kids.get(u)) { level.set(v, Math.max(level.get(v) ?? 0, level.get(u) + 1)); indeg.set(v, indeg.get(v) - 1); if (!indeg.get(v)) order.push(v); } }
+  for (const u of order) if (!pars.get(u).size && kids.get(u).size) level.set(u, Math.min(...[...kids.get(u)].map(v => level.get(v))) - 1);
+  const linked = ids.filter(i => kids.get(i).size || pars.get(i).size), lo = Math.min(0, ...linked.map(i => level.get(i)));
+  linked.forEach(i => level.set(i, level.get(i) - lo));
+  const max = Math.max(0, ...linked.map(i => level.get(i)));
+  ids.forEach(i => { if (!kids.get(i).size && !pars.get(i).size) level.set(i, max + 1); });
   return level;
 }
 const posKey = nid => { if (!String(nid).startsWith('E:')) return nid; const e = S.ents.get(R(nid.slice(2))); return e ? 'U:' + uidOf(e) : nid; };
@@ -3466,8 +3472,20 @@ function swapData(nodes, edges, kind, seeded) {
     setTimeout(() => network.fit(), 30);
   }
 }
-function settle(ms) {
+function relayout() {
+  if (!network) return;
+  if (S.settling) { freezeLayout(true); return; }
+  if (S.layout === 'hier') { S._pos?.delete(S._kind + '|hier'); render(); return; }
+  const pos = network.getPositions(), ids = Object.keys(pos); if (!ids.length) return;
+  const xs = ids.map(i => pos[i].x), ys = ids.map(i => pos[i].y);
+  const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 200);
+  const r = 0.6 * span / Math.sqrt(ids.length);
+  for (const id of ids) { const a = Math.random() * Math.PI * 2, d = r * (0.4 + 0.6 * Math.random()); try { network.moveNode(id, pos[id].x + Math.cos(a) * d, pos[id].y + Math.sin(a) * d); } catch {} }
+  settle(3000, 900);
+}
+function settle(ms, minMs = 0) {
   clearTimeout(S._settleT);
+  S._settleMin = Date.now() + minMs;
   const g = S.gen = (S.gen || 0) + 1;
   S.settling = true; S._stabilizing = false;
   network.setOptions({ physics: { enabled: true } });
@@ -4502,6 +4520,8 @@ async function runSelfTest() {
 
     const lv = hierLevels([{ id: 'emp' }, { id: 'mgr' }, { id: 'org' }, { id: 'lone' }], [{ from: 'mgr', to: 'org', _t: 'WORKS_FOR' }, { from: 'org', to: 'mgr', _t: 'EMPLOYS' }, { from: 'emp', to: 'mgr', _t: 'REPORTS_TO' }]);
     ok('hierarchy view: compact levels on a cyclic graph, superiors on top', lv.get('org') < lv.get('mgr') && lv.get('mgr') < lv.get('emp') && Math.max(...lv.values()) <= 3, JSON.stringify([...lv]));
+    const lv2 = hierLevels(['city', 'ceo', 'cto', 'eng', 'dept'].map(id => ({ id })), [{ from: 'ceo', to: 'city', _t: 'LOCATED_IN' }, { from: 'cto', to: 'city', _t: 'LOCATED_IN' }, { from: 'eng', to: 'city', _t: 'LOCATED_IN' }, { from: 'cto', to: 'ceo', _t: 'REPORTS_TO' }, { from: 'eng', to: 'cto', _t: 'REPORTS_TO' }, { from: 'cto', to: 'dept', _t: 'HEADS' }, { from: 'cto', to: 'dept', _t: 'MEMBER_OF' }]);
+    ok('hierarchy view: a reporting chain gets one row per level even when everyone shares a city', lv2.get('ceo') < lv2.get('cto') && lv2.get('cto') < lv2.get('eng') && lv2.get('city') < lv2.get('ceo') && [...lv2.values()].every(Number.isFinite), JSON.stringify([...lv2]));
 
     group = 'Evidence & ontology consistency';
     ok('co-occurrence links are hidden by default (Links shown)', $('#oTier').value === 'noco' && opts().cooccur === false);
@@ -4524,6 +4544,9 @@ async function runSelfTest() {
     ok('cross-format: every entity from customers.csv / suppliers.json sits under Organization in the ontology', ['Blue Harbor Foods', 'Northwind Traders', 'Contoso Ltd', 'Acme Corp', 'Globex Corporation'].every(n => { const e = E(n); return e && isA(typeOf(e), 'Organization'); }), ['Blue Harbor Foods', 'Northwind Traders', 'Contoso Ltd', 'Acme Corp', 'Globex Corporation'].map(n => E(n) ? typeOf(E(n)) : '-').join(', ') + ' ' + JSON.stringify(S.alignParents));
     ok('cross-format: a class stated by one source (type = Partner) is aligned under the core class its members have (Partner ⊂ Organization)', S.alignParents.Partner === 'Organization' && isA('Partner', 'Organization') && typeOf(E('Initech LLC') || {}) === 'Partner', JSON.stringify(S.alignParents) + ' ' + typeOf(E('Initech LLC') || {}));
     ok('"Contoso Ltd hired Ana Lopez" → Ana works for Contoso (not reports to)', has('Ana Lopez', 'WORKS_FOR', 'Contoso Ltd') && !has('Ana Lopez', 'REPORTS_TO', 'Contoso Ltd'));
+    await load({ 'cust/notes.txt': 'Varden Pinelake is a customer of Brindle Analytics. Talia Moss is a client of Brindle Analytics.', 'cust/staff.csv': 'name,title,company\nOren Vale,Research Director,Varden Pinelake' });
+    ok('"X is a customer of Y" → Y HAS_CUSTOMER X (not X SERVES Y)', has('Brindle Analytics', 'HAS_CUSTOMER', 'Varden Pinelake') && !has('Varden Pinelake', 'SERVES', 'Brindle Analytics'));
+    ok('a role noun like “customer” does not make a company a Person, so its staff are not “reporting to” it', typeOf(E('Varden Pinelake') || {}) !== 'Person' && has('Oren Vale', 'WORKS_FOR', 'Varden Pinelake') && !has('Oren Vale', 'REPORTS_TO', 'Varden Pinelake'), typeOf(E('Varden Pinelake') || {}));
 
     group = 'Round-6 scale & usability';
     const comm = louvain(6, [[0, 1, 1], [1, 2, 1], [0, 2, 1], [3, 4, 1], [4, 5, 1], [3, 5, 1], [2, 3, 0.3]]);
@@ -4658,6 +4681,16 @@ async function runSelfTest() {
     ok('provenance complete after re-import', provClean(), S.diag.unknownProv);
     ok('certified term, synonyms and description survive the round trip', S.terms.get('C:Person')?.status === 'certified' && ['employee', 'staff'].every(x => S.terms.get('C:Person').syn.includes(x)) && S.terms.get('C:Person').desc === 'Someone in the org chart', JSON.stringify(S.terms.get('C:Person')));
     S.terms = new Map();
+
+    group = 'Re-layout';
+    if (S.layout !== 'force') { S.layout = 'force'; $('#tLayout').textContent = 'Layout: force'; render(); await sleep(300); }
+    if (S.settling) freezeLayout(true);
+    network.setOptions({ physics: { enabled: true } }); await new Promise(r => { const t = setTimeout(r, 4000); network.once('stabilizationIterationsDone', () => { clearTimeout(t); r(); }); network.stabilize(3000); }); network.setOptions({ physics: { enabled: false } }); await sleep(200);
+    const rp0 = network.getPositions(); relayout(); await sleep(300); const rRun = S.settling && /Stop/.test($('#tPhys').textContent);
+    await sleep(900); const rp1 = network.getPositions(), rIds = Object.keys(rp0), rMoved = rIds.filter(k => rp1[k] && Math.hypot(rp0[k].x - rp1[k].x, rp0[k].y - rp1[k].y) > 2).length;
+    ok('Re-layout on an already-settled graph keeps running and moves the nodes', rRun && rMoved >= rIds.length / 2, `running ${rRun}, moved ${rMoved}/${rIds.length}`);
+    if (S.settling) freezeLayout(true);
+    ok('pressing it again while running stops it', !S.settling && /Re-layout/.test($('#tPhys').textContent));
 
     group = 'Full screen';
     applyFull(true, 'focus');
@@ -4813,7 +4846,7 @@ $('#tSnap').onclick = () => saveSnapshot();
 $('#tOnto').onclick = () => setView('ontology');
 $('#tKG').onclick = () => setView('kg');
 markView();
-$('#tPhys').onclick = () => { if (!network) return; if (S.settling) freezeLayout(true); else settle(3000); };
+$('#tPhys').onclick = () => relayout();
 $('#q').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(e.target.value); });
 $('#q').addEventListener('change', e => doSearch(e.target.value));
 document.addEventListener('keydown', e => {
