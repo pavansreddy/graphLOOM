@@ -48,6 +48,10 @@ Everything is processed locally in your browser.
 
 ## ⚡ Quick start
 
+Right click on the file and download ontology-graph-explorer.html
+
+OR
+
 ```bash
 git clone https://github.com/pavansreddy/graphLOOM.git
 cd graphloom
