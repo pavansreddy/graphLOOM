@@ -173,6 +173,7 @@ aside.right{border-left:1px solid var(--border)}
 aside.right{position:relative}
 .details h2{padding-right:30px}
 .close-details{position:absolute;top:10px;right:10px;z-index:2}
+.bench{margin-bottom:8px}.bench .bench-fmt{margin:6px 0}.bench pre{margin:6px 0 0;padding:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;font:11px/1.45 ui-monospace,Consolas,monospace;color:var(--text-2);white-space:pre;overflow:auto}#benchmarkOut:empty{display:none}#benchmarkOut{white-space:pre-wrap;margin-top:6px}
 .fs-only,.fs-only-btn{display:none}
 .stage.fs .fs-only-btn{display:inline-flex}
 .stage.fs .fs-only{display:inline-flex;gap:0}
@@ -265,7 +266,7 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
       <ol>
         <li><b>Ontology</b> — each circle is a <i>class</i> (a Neo4j label); size = number of instances. Arrows are <i>relationship types</i> from domain → range. Grey dashed arrows are <code>SUBCLASS_OF</code>; dashed coloured arrows are relations a document declares.</li>
         <li><b>Knowledge graph</b> — each class expands into its entities, coloured by class; hubs grow with connections.</li>
-        <li><b>Line styles</b> show the evidence, not the method — solid = <i>explicit</i> (stated in the source) · dash-dot = <i>derived</i> (computed from other facts, e.g. reporting lines, e-mail domains) · dashed = <i>inferred</i> (likely, not stated) · dotted = <i>co-occurrence</i> (hidden by default). A <b>?</b> after a name means the relationship is stated but its name was guessed from the verb. Filter with <b>Links shown</b>.</li>
+        <li><b>Line styles</b> show the evidence, not the method — solid = <i>explicit</i> (stated in the source) · dash-dot = <i>derived</i> (computed from other facts, e.g. reporting lines, e-mail domains) · dashed = <i>inferred</i> (likely, not stated) · dotted = <i>co-occurrence</i> (hidden by default). A <b>?</b> after a name means the relationship is stated but its name was guessed from the verb. <i>(possible)</i> = stated as planned or uncertain, <i>(former)</i> = no longer true; statements that something is <i>not</i> the case appear only with <b>Links shown → All</b>, as <code>NOT …</code>. Filter with <b>Links shown</b>.</li>
         <li>Click anything for properties, provenance and source sentences; double-click a class to explore its instances.</li>
         <li>Click legend items to hide classes; <b>Min mentions</b> / <b>Max graph nodes</b> de-clutter big corpora.</li>
         <li>Export to Cypher, Excel or Neo4j — in Neo4j, <code>CALL db.schema.visualization()</code> shows the same ontology.</li>
@@ -306,7 +307,7 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
       <label class="field"><span>Vision model (images &amp; scanned pages)</span><input id="vlmModel" value="meta/llama-3.2-11b-vision-instruct"></label>
       <label class="field"><span>Vision endpoint (blank = same as above)</span><input id="vlmUrl" placeholder="same as endpoint"></label>
       <label class="field"><span>Use vision for</span><select id="vlmMode"><option value="weak" selected>Only images where OCR finds little (recommended)</option><option value="always">Every image</option></select></label>
-      <div class="hint">Browsers may block the hosted API (CORS). A local NIM container (e.g. http://localhost:8000/v1/chat/completions) or a small proxy works. Some hosted vision models use their own URL — copy it from the model's page on build.nvidia.com. On failure the built-in engine / OCR is used.</div>
+      <div class="hint">Remote endpoints receive document text and may receive images. Confirm that the endpoint is trusted and that you have permission to transmit the files.</div><div class="hint">Browsers may block the hosted API (CORS). A local NIM container (e.g. http://localhost:8000/v1/chat/completions) or a small proxy works. Some hosted vision models use their own URL — copy it from the model's page on build.nvidia.com. On failure the built-in engine / OCR is used.</div>
     </div>
     <div class="opt" style="margin-top:8px"><label title="Tesseract.js runs in your browser; first use downloads ~10 MB of OCR data"><input type="checkbox" id="oOcr" checked> OCR images &amp; scanned PDFs (offline)</label></div>
     <div class="opt"><label title="Runs in your browser on background threads (transformers.js + distilBERT-NER). One-time download ~66 MB, then cached for offline use. Finds and types people, organisations and places the rules miss."><input type="checkbox" id="oNer"> AI entity model (offline after a one-time ~66 MB download)</label></div>
@@ -326,8 +327,11 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
   </div>
   <div class="sec">
     <h3><span>4 · Quality</span><button class="btn sm" id="selfTest" title="Runs built-in example inputs with known answers and checks the results">Run self-test</button></h3>
-    <div id="diag" class="log" style="max-height:none">Load files to see extraction quality.</div>
+    <div class="bench"><button class="btn sm" id="benchmarkBtn" title="Score this graph against a hand-labelled reference file (precision, recall, F1)">Benchmark against a reference file…</button><input type="file" id="benchmarkFile" accept=".json,application/json" hidden><details class="howto bench-fmt"><summary><h4>File format</h4></summary><pre>{ "entities":  [ { "name": "Acme Corp", "type": "Organization" } ],
+  "relations": [ { "source": "Jane Doe", "relation": "WORKS_FOR",
+                   "target": "Acme Corp" } ] }</pre></details><div id="benchmarkOut" class="log" aria-live="polite"></div></div><div id="diag" class="log" style="max-height:none">Load files to see extraction quality.</div>
   </div>
+  <div class="sec"><h3>Graph navigation</h3><label class="field"><span>Starting entity</span><input id="navStart" list="names" placeholder="Entity name"></label><label class="field"><span>Destination (optional)</span><input id="navEnd" list="names" placeholder="Entity name"></label><div class="opt"><span>Maximum hops</span><select id="navHops"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div><button class="btn sm" id="navGo">Explore connections / shortest path</button><button class="btn sm" id="navClear">Clear</button><div id="navResults" class="log" aria-live="polite"></div></div>
   <div class="sec">
     <h3>Pipeline log</h3>
     <div class="steps" id="steps"><i></i><i></i><i></i><i></i><i></i></div>
@@ -371,6 +375,7 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
 </div>
 </div>
 
+<dialog id="remoteDlg"><form method="dialog"><h3>Send documents to an external model?</h3><p id="remoteMessage">The configured model endpoint will receive document content, which may contain sensitive information. The endpoint operator may retain or process the data under its policies.</p><div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" value="cancel">Use built-in engine</button><button class="btn primary" value="confirm">Allow and send</button></div></form></dialog>
 <dialog id="neoDlg">
   <form method="dialog" id="neoForm">
     <h3>Push to Neo4j</h3>
@@ -674,6 +679,10 @@ function addRel(a, b, type, doc, evidence, props, prov = UNKNOWN_PROV) {
   if (doc) r.docs.add(doc);
   if (evidence) addEvidence(r.evidence, doc, evidence);
   if (props) for (const k in props) setMulti(r.props, k, props[k]);
+  const as = r.assert ||= { yes: 0, neg: 0, spec: 0, past: 0 };
+  if (props?.negated === true || props?.negated === 'true') as.neg++;
+  else if (props?.modality) as.spec++;
+  else { as.yes++; if (props?.temporal_context === 'historical') as.past++; }
   return r;
 }
 function mergeEnt(fromId, toId, reason = 'alias') {
@@ -2747,9 +2756,11 @@ async function heuristicExtract(textDocs) {
         const [from, to] = found.reverse ? [eb, subj] : [subj, eb];
         const props = { date, amount, percent: pct };
         if (found.role) { props.role = found.role; if (!from.props.role) from.props.role = found.role; }
-        const modal = found.modality || (lb.match(/\b(will|would|shall|should|could|may|might|plans? to|planned to|intends? to|aims? to|is going to|are going to|agreed to|is expected to|is set to)\b/) || [])[1];
+        const asrt = assertionOf((lead.split(/[.;:]/).pop() || '') + ' ' + lb.replace(/\s+(?:of|at|for|in|to|with|by)(?:\s+the)?\s*$/, ''), lb);
+        const modal = found.modality || (asrt.status === 'speculative' ? asrt.modal : null);
         if (modal) props.modality = modal;
-        if (/\b(not|never|no longer|n't|denied|declined to|refused to|failed to)\b/.test(lb)) props.negated = true;
+        if (asrt.status === 'negated') props.negated = true;
+        if (asrt.historical) props.temporal_context = 'historical';
         const fp = (a.coref || b.coref) ? P.coref : (found.prov || P.rule);
         addRel(from, to, found.type, d.name, s, props, fp); typed++;
         const hint = REL_TYPE_HINT[found.type];
@@ -2872,6 +2883,92 @@ function chunkText(t, size = 3200) {
   if (cur.trim()) out.push(cur);
   return out;
 }
+const NEG_RX = /\b(?:not|never|neither|nor|n['’]t|cannot|denied|denies|deny|declined to|refused to|failed to|ruled out)\b|n['’]t\b/i;
+const SPEC_RX = /\b(?:might|could|would|should|shall|will|possibly|potentially|perhaps|allegedly|reportedly|rumou?red to|unconfirmed|expected to|likely to|set to|plans? to|planned to|planning to|intends? to|intended to|aims? to|seeks? to|seeking to|hopes? to|considering|in talks to|negotiating to|proposes? to|proposed to|is going to|are going to|agreed to)\b/i;
+const MAY_RX = /\bmay\b(?!\s+\d)/;
+const COND_RX = /\b(?:if|unless|whether)\b/i;
+const PAST_STATE_RX = /\b(?:formerly|previously|former|no longer|used to|until|resigned|retired|stepped down|departed|ceased)\b|(?:^|[^\p{L}])ex-\p{L}/iu;
+const CURRENT_RX = /\b(?:currently|presently|now|still|today|remains?)\b/i;
+function assertionOf(pre, whole = pre) {
+  const seg = String(pre || '').split(/[,;:(]/).pop();
+  const ctx = String(whole || '');
+  const historical = PAST_STATE_RX.test(ctx) && !CURRENT_RX.test(ctx);
+  if (/\bno longer\b|\bnot anymore\b/i.test(seg)) return { status: 'asserted', historical: true };
+  if (NEG_RX.test(seg)) return { status: 'negated', historical };
+  const m = seg.match(SPEC_RX) || seg.match(MAY_RX) || String(pre || '').match(COND_RX);
+  if (m) return { status: 'speculative', modal: m[0].toLowerCase(), historical };
+  return { status: 'asserted', historical };
+}
+function relAssertion(r) {
+  const a = r && r.assert; if (!a) return 'asserted';
+  if (a.yes) return a.past && a.past === a.yes ? 'historical' : 'asserted';
+  return a.neg ? 'negated' : a.spec ? 'speculative' : 'asserted';
+}
+const ASSERT_LABEL = { negated: 'stated as not true', speculative: 'possible / planned, not confirmed', historical: 'former (no longer true)', asserted: 'stated as fact' };
+const LLM_MAX_CHUNKS = 300;
+const TERM_RX = new Map();
+function termRx(t) {
+  let rx = TERM_RX.get(t);
+  if (!rx) { rx = new RegExp('(^|[^\\p{L}\\p{N}])' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+') + '(?=$|[^\\p{L}\\p{N}])', 'iu'); TERM_RX.set(t, rx); }
+  return rx;
+}
+const WORK_RELS = /^(WORKS_FOR|EMPLOYED_BY|WORKS_AT|EMPLOYEE_OF|MEMBER_OF|LEADS|HEADS|MANAGES|CEO_OF|FOUNDED|REPORTS_TO)$/;
+const ROLE_CUES = ['ceo', 'cto', 'cfo', 'coo', 'cio', 'chief', 'founder', 'co-founder', 'director', 'manager', 'head', 'president', 'chair', 'engineer', 'lead', 'officer', 'scientist', 'analyst', 'vp', 'partner at', 'employee', 'staff', 'team', 'joined', 'hired', 'at'];
+const PRED_CUES = {
+  ACQUIRED: ['acquir', 'bought', 'buy', 'purchas', 'takeover', 'took over', 'merged with'],
+  OWNS: ['own', 'possess', 'belong', 'stake'], OWNED_BY: ['own', 'possess', 'belong', 'stake'],
+  WORKS_FOR: ['work', 'employ'], EMPLOYED_BY: ['work', 'employ'],
+  REPORTS_TO: ['report', 'supervis', 'manager', 'boss', 'under'],
+  LOCATED_IN: ['locat', 'based', 'situat', 'headquarter', 'hq', 'office', 'site', 'plant', 'campus', 'in'], BASED_IN: ['based', 'locat', 'headquarter', 'office', 'in'], HEADQUARTERED_IN: ['headquarter', 'hq', 'based'],
+  FOUNDED: ['found', 'establish', 'start', 'launch', 'creat'], FOUNDED_BY: ['found', 'establish', 'start'],
+  PART_OF: ['part of', 'component', 'belong', 'subsidiar', 'division', 'unit', 'within'], MEMBER_OF: ['member', 'belong', 'join', 'team', 'in the'],
+  PARTNERS_WITH: ['partner', 'collaborat', 'alliance', 'teamed', 'joint'], PARTNERED_WITH: ['partner', 'collaborat', 'alliance'],
+  INVESTED_IN: ['invest', 'fund', 'financ', 'backed', 'stake'],
+  PRODUCES: ['produc', 'manufactur', 'make', 'made', 'build', 'built'], MANUFACTURES: ['manufactur', 'produc', 'make', 'made', 'build'],
+  CREATED: ['creat', 'develop', 'built', 'made', 'design'], DEVELOPED: ['develop', 'creat', 'built', 'design'],
+  USES: ['use', 'using', 'utiliz', 'run on', 'runs on', 'built on', 'powered by', 'adopt', 'deploy'],
+  SUPPLIES: ['suppl', 'provid', 'deliver', 'vendor'], COMPETES_WITH: ['compet', 'rival'],
+  MARRIED_TO: ['marri', 'spous', 'wife', 'husband', 'wedding'], PARENT_OF: ['parent', 'mother', 'father'],
+  SUBCLASS_OF: ['subclass', 'type of', 'kind of', 'category of', 'is a'], HAS_CUSTOMER: ['customer', 'client', 'serves', 'sells to']
+};
+const CUE_RX = new Map();
+function predicateCueRx(predicate) {
+  const raw = upperSnake(predicate || '');
+  if (CUE_RX.has(raw)) return CUE_RX.get(raw);
+  const stems = raw.toLowerCase().split('_').filter(w => w.length > 2 && !['the', 'has', 'was', 'had', 'with', 'from', 'for', 'and'].includes(w)).map(w => w.replace(/(ed|ing|es|s)$/, ''));
+  const cues = [...new Set([...(PRED_CUES[raw] || []), ...stems, ...(WORK_RELS.test(raw) ? ROLE_CUES : [])])].filter(w => w.length >= 2);
+  const rx = cues.length ? new RegExp('(?<![\\p{L}\\p{N}])(?:' + cues.sort((a, b) => b.length - a.length).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+') + (w.length <= 3 ? '(?![\\p{L}])' : '')).join('|') + ')', 'iu') : null;
+  CUE_RX.set(raw, rx);
+  return rx;
+}
+function llmSupport(sents, srcNames, tgtNames, predicate, props = {}) {
+  const terms = xs => [...new Set(xs.filter(Boolean).map(x => String(x).toLowerCase().trim()).filter(x => x.length > 1))];
+  const A = terms(srcNames), B = terms(tgtNames), has = (s, T) => T.some(t => termRx(t).test(s));
+  const wantsCurrent = Object.entries(props || {}).some(([k, v]) => /^(?:status|tense|time|temporal|validity|current|active)$/i.test(k) && /^(?:current|active|present|ongoing|now|true)$/i.test(String(v)));
+  const cueRx = predicateCueRx(predicate);
+  const candidates = [];
+  sents.forEach((s, i) => { if (has(s, A) && has(s, B)) candidates.push({ same: true, text: s }); });
+  for (let i = 1; i < sents.length; i++) if ((has(sents[i - 1], A) && has(sents[i], B)) || (has(sents[i - 1], B) && has(sents[i], A))) candidates.push({ same: false, text: sents[i - 1] + ' ' + sents[i] });
+  let weak = null, rejected = null;
+  for (const cand of candidates) {
+    const clauses = cand.text.split(/(?<=[.!?;:])\s+|\s*;\s*|\s*,?\s+\b(?:but|however|although|whereas|instead|rather than)\b\s*/i).filter(Boolean);
+    const both = clauses.filter(c => has(c, A) && has(c, B));
+    for (const c of both.length ? both : clauses) {
+      const m = cueRx ? cueRx.exec(c) : null;
+      if (m) {
+        const res = assertionOf(c.slice(0, m.index), c);
+        if (wantsCurrent && res.historical) { rejected ||= { ...cand, text: c.trim(), cue: true, status: 'historical_conflict' }; continue; }
+        if (res.status === 'asserted') return { ...cand, text: c.trim(), cue: true, ...res };
+        rejected ||= { ...cand, text: c.trim(), cue: true, ...res };
+      } else if (!weak) {
+        const res = NEG_RX.test(c) && !/\bno longer\b/i.test(c) ? { status: 'negated' } : { status: 'asserted', historical: PAST_STATE_RX.test(c) && !CURRENT_RX.test(c) };
+        if (res.status === 'asserted') weak = { ...cand, text: c.trim(), cue: false, ...res };
+        else rejected ||= { ...cand, text: c.trim(), cue: false, ...res };
+      }
+    }
+  }
+  return weak || rejected || null;
+}
 function planLLMJobs(textDocs, cap = 80) {
   const jobs = [], plan = { docs: textDocs.length, structuredOnly: 0, chunks: 0, sent: 0, capped: 0, skippedChars: 0 };
   for (const d of textDocs) {
@@ -2886,12 +2983,15 @@ function planLLMJobs(textDocs, cap = 80) {
 }
 const REL_VOCAB = () => [...new Set([...RULES.map(r => r[1]), 'REPORTS_TO', 'MEMBER_OF', 'WORKS_FOR', 'LOCATED_IN', 'PART_OF', ...(S.declared?.relations || []).map(r => r.name)])];
 async function llmExtract(textDocs, cfg) {
-  const { jobs: capped, plan } = planLLMJobs(textDocs);
+  const { jobs: capped, plan } = planLLMJobs(textDocs, LLM_MAX_CHUNKS);
   S.diag.llm = { ...plan, done: 0, failed: 0 };
   log(`  LLM input: ${plan.chunks} prose chunk(s) from ${plan.docs - plan.structuredOnly} doc(s); ${plan.structuredOnly} fully-structured doc(s) skipped; ${fmt(plan.skippedChars)} chars of tables/records not re-sent`);
-  if (plan.capped) log(`  capped at ${plan.sent} of ${plan.chunks} chunks`, 'w');
+  if (plan.capped) { log(`  capped at ${plan.sent} of ${plan.chunks} chunks`, 'w'); S.diag.incomplete = true; }
   if (!capped.length) { log('  nothing left for the LLM — structured extraction covered it', 'ok'); return; }
-  const sample = capped.map(j => j.c).join('\n\n').slice(0, 10000);
+  const samples = [];
+  const stride = Math.max(1, Math.ceil(capped.length / 12));
+  for (let i = 0; i < capped.length && samples.length < 12; i += stride) samples.push(capped[i].c.slice(0, 1400));
+  const sample = samples.join('\n\n').slice(0, 16000);
   const known = S.declared ? `\nThe documents declare these classes, use them: ${Object.keys(S.declared.classes).join(', ')}.` : '';
   log(`  pass 1 · inducing ontology with ${cfg.model}…`);
   const ontoRaw = await callLLM([
@@ -2924,15 +3024,25 @@ async function llmExtract(textDocs, cfg) {
         }
         for (const r of out.relations || []) {
           const a = byName.get(norm(r.source)) || getEnt(r.source, null, d.name, 1, P.llm), b = byName.get(norm(r.target)) || getEnt(r.target, null, d.name, 1, P.llm);
-          const sn = sents.find(s => { const l = s.toLowerCase(); return l.includes(String(r.source).toLowerCase()) && l.includes(String(r.target).toLowerCase()); }) || sents.find(s => s.toLowerCase().includes(String(r.source).toLowerCase()));
           const props = {}; for (const [k, v] of Object.entries(r.properties || {})) if (v != null && typeof v !== 'object') props[k] = v;
-          addRel(a, b, upperSnake(r.relation), d.name, sn || null, props, sn ? P.llmRel : P.llm);
+          const ev = llmSupport(sents, [r.source, a?.name, ...(a?.aliases || [])], [r.target, b?.name, ...(b?.aliases || [])], r.relation, props);
+          const bump = k => { S.diag[k] = (S.diag[k] || 0) + 1; };
+          if (!ev || ev.status === 'historical_conflict') { bump('unverifiedLLM'); continue; }
+          const p2 = { ...props };
+          if (ev.status === 'negated') { p2.negated = true; bump('negatedLLM'); }
+          else if (ev.status === 'speculative') { p2.modality = ev.modal; bump('speculativeLLM'); }
+          if (ev.historical) p2.temporal_context = 'historical';
+          if (!ev.same) bump('nearbyLLM');
+          if (!ev.cue) bump('noCueLLM');
+          addRel(a, b, upperSnake(r.relation), d.name, ev.text, p2, ev.same && ev.cue ? P.llmRel : P.llm);
         }
       } catch (e) { failed++; S.diag.llm.failed++; if (failed <= 3) log(`  chunk failed (${d.name}): ${e.message}`, 'w'); if (failed >= 3 && done === 0) throw e; }
       done++; S.diag.llm.done = done; busy(true, `LLM extraction ${done}/${total}…`);
     }
   }
   await Promise.all([worker(), worker(), worker()]);
+  if (S.diag.nearbyLLM) log(`  ${S.diag.nearbyLLM} LLM relationship(s) supported only by neighbouring sentences — kept as inferred`, 'w');
+  if (S.diag.unverifiedLLM) log(`  ${S.diag.unverifiedLLM} LLM relationship(s) with no supporting text excluded`, 'w');
   log(`  extracted ${fmt(S.ents.size)} entities, ${fmt(S.rels.size)} relationships`, 'ok');
 }
 
@@ -2966,9 +3076,21 @@ async function rebuildNow(opt = {}) {
   if (!docs.length) { busy(false); return; }
   const nameCount = new Map(); docs.forEach(d => nameCount.set(d.name, (nameCount.get(d.name) || 0) + 1));
   docs.forEach(d => { if (nameCount.get(d.name) > 1) d.name = d.path; });
-  const eng0 = opt.engine || document.querySelector('input[name=eng]:checked').value;
+  let eng0 = opt.engine || document.querySelector('input[name=eng]:checked').value;
   const cfg0 = { url: $('#llmUrl').value.trim(), key: $('#llmKey').value.trim(), vmodel: $('#vlmModel').value.trim(), vurl: $('#vlmUrl').value.trim() };
   const vEndpoint = cfg0.vurl || cfg0.url;
+  if (eng0 === 'llm' && !opt.remoteApproved && docs.some(d => (d.text || '').trim() || d.images?.length)) {
+    const consentKey = [cfg0.url, cfg0.vurl, ...docs.map(d => d.path)].join('|');
+    if (!(S._remoteOk ||= new Set()).has(consentKey)) {
+      const est = planLLMJobs(docs.filter(d => d.text), LLM_MAX_CHUNKS).plan, imgs = docs.reduce((a, d) => a + (d.images?.length || 0), 0);
+      const dialog = $('#remoteDlg');
+      $('#remoteMessage').textContent = `The configured endpoint (${cfg0.url}) will receive document text${imgs && cfg0.vmodel ? ' and possibly images' : ''}: up to ${fmt(est.sent)} request(s)${est.capped ? ` (capped from ${fmt(est.chunks)} text chunks)` : ''} from ${fmt(docs.length)} file(s). Only continue if you trust this service and are authorized to transmit these documents. If you cancel, the built-in offline engine is used instead.`;
+      dialog.returnValue = ''; dialog.showModal();
+      const allowed = await new Promise(resolve => dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true }));
+      if (allowed) S._remoteOk.add(consentKey);
+      else { eng0 = 'heur'; opt = { ...opt, engine: 'heur' }; log('Remote processing cancelled: nothing was sent; using the built-in engine for this run.', 'w'); }
+    }
+  }
   await prepareImages(docs, eng0 === 'llm' && !!cfg0.vmodel && (!!cfg0.key || !/nvidia\.com/.test(vEndpoint)), cfg0);
   busy(true, 'Building ontology…'); step(2, 'run'); await sleep(20);
   resetStore();
@@ -3137,7 +3259,9 @@ function computeView() {
   for (const r of S.rels.values()) {
     if (r.type === 'MENTIONS' && !o.docs) continue;
     if (r.type === 'RELATED_TO' && !o.cooccur) continue;
-    if (r.type !== 'MENTIONS' && (TIER_RANK[r.tier] || 0) < o.minTier) continue;
+    const ra = relAssertion(r);
+    if (ra === 'negated' && !o.cooccur) continue;
+    if (r.type !== 'MENTIONS' && Math.min(TIER_RANK[r.tier] || 0, ra === 'speculative' ? TIER_RANK.inferred : 9) < o.minTier) continue;
     const f = R(r.from), t = R(r.to); if (f === t) continue;
     rels.push(f === r.from && t === r.to ? r : { ...r, from: f, to: t });
   }
@@ -3162,18 +3286,21 @@ function computeView() {
   const deg = new Map(); rels.forEach(r => { if (r.type === 'MENTIONS') return; deg.set(r.from, (deg.get(r.from) || 0) + 1); deg.set(r.to, (deg.get(r.to) || 0) + 1); });
   let kE = ents;
   if (S.focus) {
-    const seeds = new Set(S.focus.kind === 'type' ? ents.filter(e => typeOf(e) === S.focus.value).map(e => e.id) : [S.focus.value]);
+    const fixedSet = S.focus.kind === 'path' || S.focus.kind === 'set';
+    const seeds = new Set(fixedSet ? S.focus.ids : S.focus.kind === 'type' ? ents.filter(e => typeOf(e) === S.focus.value).map(e => e.id) : [S.focus.value]);
     const keep = new Set(seeds);
-    rels.forEach(r => { if (r.type === 'MENTIONS' && S.focus.kind !== 'entity') return; if (seeds.has(r.from)) keep.add(r.to); if (seeds.has(r.to)) keep.add(r.from); });
+    if (!fixedSet) rels.forEach(r => { if (r.type === 'MENTIONS' && S.focus.kind !== 'entity') return; if (seeds.has(r.from)) keep.add(r.to); if (seeds.has(r.to)) keep.add(r.from); });
     kE = ents.filter(e => keep.has(e.id));
   }
+  const preIso = kE.length;
   if (o.hideIso) kE = kE.filter(e => e.isDoc || deg.get(e.id) || (S.focus && S.focus.value === e.id));
+  const isoHidden = preIso - kE.length, preCap = kE.length;
   const score = e => (deg.get(e.id) || 0) * 2 + e.mentions + (S.focus && S.focus.value === e.id ? 1e6 : 0) + (e.isDoc ? 1e5 : 0);
   kE = [...kE].sort((a, b) => score(b) - score(a)).slice(0, o.maxNodes);
   const kIds = new Set(kE.map(e => e.id));
   const kR = rels.filter(r => kIds.has(r.from) && kIds.has(r.to));
   const ontoEnts = o.hideIso ? ents.filter(e => e.isDoc || e.structured || typedIds.has(e.id) || (deg.get(e.id) && e.mentions >= 2)) : ents;
-  return { full: { ents, rels }, onto: { ents: ontoEnts, rels }, kg: { ents: kE, rels: kR }, deg, truncated: Math.max(0, (S.focus ? kE.length : ents.length) - kE.length) };
+  return { full: { ents, rels }, onto: { ents: ontoEnts, rels }, kg: { ents: kE, rels: kR }, deg, truncated: Math.max(0, preCap - kE.length), isoHidden };
 }
 const PARENT = { Person: 'Agent', Organization: 'Agent', Department: 'Organization', Location: 'Place', Product: 'Artifact', Project: 'Artifact', Document: 'Artifact', Event: 'Occurrence', Category: 'Concept' };
 function buildOntology(full) {
@@ -3400,11 +3527,12 @@ function renderKG(seeds) {
     const propsTxt = Object.entries(r.props || {}).filter(([k, v]) => v != null).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n');
     const guessed = r.labelConf === 'guessed';
     const evidence = weak ? 'co-occurrence' : r.tier === 'explicit' ? 'explicit (stated in the source)' : r.tier === 'derived' ? 'derived (computed from other facts)' : 'inferred (likely, not stated)';
-    return { id, from: 'E:' + r.from, to: 'E:' + r.to, label: o.labels && !weak ? r.type + (guessed ? ' ?' : '') : undefined,
-      title: `${r.type}${r.weight > 1 ? ' ×' + r.weight : ''}\nevidence: ${evidence}${guessed ? '\nname guessed from the verb' : r.labelConf === 'model' ? '\nname from the LLM' : ''}\nmethod: ${[...(r.extractors || [])].join(', ')}${propsTxt ? '\n' + propsTxt : ''}`,
-      width: weak ? 0.8 : 1.2 + Math.min(3, Math.log2(r.weight || 1)), dashes: weak || r.tier === 'co_occurrence' ? [2, 5] : r.tier === 'derived' ? [10, 4, 2, 4] : r.tier !== 'explicit' ? [8, 5] : false, font: edgeFont(),
+    const ra = relAssertion(r), raTag = { negated: 'NOT ', speculative: '', historical: '', asserted: '' }[ra], raSuffix = { speculative: ' (possible)', historical: ' (former)' }[ra] || '';
+    return { id, from: 'E:' + r.from, to: 'E:' + r.to, label: o.labels && !weak ? raTag + r.type + (guessed ? ' ?' : '') + raSuffix : undefined,
+      title: `${r.type}${r.weight > 1 ? ' ×' + r.weight : ''}\nevidence: ${evidence}${ra !== 'asserted' ? '\nassertion: ' + ASSERT_LABEL[ra] : ''}${guessed ? '\nname guessed from the verb' : r.labelConf === 'model' ? '\nname from the LLM' : ''}\nmethod: ${[...(r.extractors || [])].join(', ')}${propsTxt ? '\n' + propsTxt : ''}`,
+      width: weak ? 0.8 : 1.2 + Math.min(3, Math.log2(r.weight || 1)), dashes: weak || r.tier === 'co_occurrence' || ra === 'negated' ? [2, 5] : ra === 'speculative' ? [8, 5] : r.tier === 'derived' ? [10, 4, 2, 4] : r.tier !== 'explicit' ? [8, 5] : false, font: edgeFont(),
       arrows: SYMMETRIC.has(r.type) || r.type === 'RELATED_TO' ? { to: { enabled: false } } : undefined,
-      color: weak ? { color: css('--text-3'), opacity: 0.35 } : { color: css('--text-3'), opacity: 0.95 } };
+      color: weak || ra === 'negated' ? { color: css('--text-3'), opacity: 0.35 } : ra === 'historical' || ra === 'speculative' ? { color: css('--text-3'), opacity: 0.55 } : { color: css('--text-3'), opacity: 0.95 } };
   });
   edges.forEach(e => { e._c = e.color; e._f = e.font; e._t = S.edgeData.get(e.id)?.r?.type; });
   assignCurves(edges);
@@ -3625,11 +3753,11 @@ function renderStats() {
   const relTypes = new Set(onto.rels.filter(r => !WEAK.has(r.type)).map(r => r.type)).size;
   $('#stats').innerHTML = S.view === 'ontology'
     ? `<b>${onto.classes.size}</b> classes · <b>${relTypes}</b> relationship types · from ${files} file(s)`
-    : `<b>${fmt(v.kg.ents.length)}</b> of ${fmt(v.full.ents.length)} entities · <b>${fmt(v.kg.rels.length)}</b> links (${fmt(typed)} typed)${v.truncated ? ` · <span style="color:var(--warn)">top ${opts().maxNodes} shown</span>` : ''}${(() => { if (opts().cooccur) return ''; const n = [...S.rels.values()].filter(r => r.tier === 'co_occurrence').length; return n ? ` · <span title="Links shown → All to see them">${fmt(n)} weak co-occurrence links hidden</span>` : ''; })()}`;
+    : `<b>${fmt(v.kg.ents.length)}</b> of ${fmt(v.full.ents.length)} entities · <b>${fmt(v.kg.rels.length)}</b> links (${fmt(typed)} typed)${v.isoHidden && !S.focus ? ` · <span title="Entities with no shown links — untick Hide isolated entities to see them">${fmt(v.isoHidden)} unlinked hidden</span>` : ''}${v.truncated ? ` · <span style="color:var(--warn)">top ${opts().maxNodes} shown</span>` : ''}${(() => { if (opts().cooccur) return ''; const n = [...S.rels.values()].filter(r => r.tier === 'co_occurrence').length; return n ? ` · <span title="Links shown → All to see them">${fmt(n)} weak co-occurrence links hidden</span>` : ''; })()}`;
 }
 function renderChip() {
   const c = $('#chip');
-  if (S.focus && S.view === 'kg') { const lbl = S.focus.kind === 'type' ? `Exploring :${S.focus.value} + neighbors` : `Neighborhood of “${S.ents.get(S.focus.value)?.name || '?'}”`; $('#chipTxt').textContent = lbl; c.style.display = 'flex'; }
+  if (S.focus && S.view === 'kg') { const lbl = S.focus.label || (S.focus.kind === 'type' ? `Exploring :${S.focus.value} + neighbors` : `Neighborhood of “${S.ents.get(S.focus.value)?.name || '?'}”`); $('#chipTxt').textContent = lbl; c.style.display = 'flex'; }
   else c.style.display = 'none';
 }
 function renderBadge() {
@@ -3718,7 +3846,7 @@ function showEdge(eid) {
   d.innerHTML = `<span class="pill" style="background:var(--panel-2);color:var(--text-2)">Relationship</span><h2>${esc(r.type)}</h2>
     <div class="rl" data-ent="${r.from}"><span class="arrow">from</span><span class="tg"><b>${esc(a?.name)}</b> <span class="muted">:${esc(a && typeOf(a))}</span></span></div>
     <div class="rl" data-ent="${r.to}"><span class="arrow">to</span><span class="tg"><b>${esc(b?.name)}</b> <span class="muted">:${esc(b && typeOf(b))}</span></span></div>
-    <table class="kv" style="margin-top:10px"><tr><td>tier</td><td>${tierBadge(r.tier)}</td></tr><tr><td>found by</td><td>${[...(r.extractors || [])].map(esc).join(', ')}</td></tr><tr><td>weight</td><td>${r.weight}</td></tr><tr><td>sources</td><td>${[...(r.docs || [])].map(esc).join(', ')}</td></tr>${props.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(Array.isArray(v) ? v.join(' | ') : v)}</td></tr>`).join('')}</table>
+    <table class="kv" style="margin-top:10px"><tr><td>tier</td><td>${tierBadge(r.tier)}</td></tr>${relAssertion(r) !== 'asserted' ? `<tr><td>assertion</td><td><b>${esc(ASSERT_LABEL[relAssertion(r)])}</b></td></tr>` : ''}<tr><td>found by</td><td>${[...(r.extractors || [])].map(esc).join(', ')}</td></tr><tr><td>weight</td><td>${r.weight}</td></tr><tr><td>sources</td><td>${[...(r.docs || [])].map(esc).join(', ')}</td></tr>${props.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(Array.isArray(v) ? v.join(' | ') : v)}</td></tr>`).join('')}</table>
     ${r.evidence?.length ? `<h4>Evidence</h4>` + r.evidence.map(ev => `<div class="ev">${esc(ev.text)}<small>${esc(ev.doc)}</small></div>`).join('') : ''}`;
 }
 $('#details').addEventListener('click', ev => {
@@ -3782,7 +3910,7 @@ function nodeProps(e) {
   return p;
 }
 function relProps(r) {
-  const p = { weight: r.weight, tier: r.tier || 'inferred', evidence_status: r.tier || 'inferred', label_confidence: r.labelConf || 'inferred', extractors: [...(r.extractors || [])].sort(), sources: [...(r.docs || [])].sort(), _source: TOOL_TAG };
+  const p = { weight: r.weight, tier: r.tier || 'inferred', evidence_status: r.tier || 'inferred', assertion: relAssertion(r), label_confidence: r.labelConf || 'inferred', extractors: [...(r.extractors || [])].sort(), sources: [...(r.docs || [])].sort(), _source: TOOL_TAG };
   for (const [k, v] of Object.entries(r.props || {})) if (v != null && v !== '' && !(k in p)) p[k.replace(/[^\w]/g, '_')] = neoVal(v);
   if (r.evidence?.length) p.evidence = r.evidence.map(ev => ev.text);
   return p;
@@ -3793,13 +3921,14 @@ function toCypher() {
   const classes = [...new Set(ents.map(typeOf))].sort();
   const L = ['// Generated by graphLOOM (Ontology & Knowledge Graph Explorer) — paste into Neo4j Browser or run with cypher-shell', '// Ontology: ' + [...onto.classes.keys()].join(', '),
     '// Every node/relationship carries tier (explicit | inferred | co_occurrence), extractors, sources and _source = "graphloom".',
+    '// Nodes are matched by uid; a node with that uid not created by graphLOOM is left untouched.',
     '// To start clean from an earlier import of this tool, first run:  MATCH (n:Entity) WHERE n._source IN ["graphloom", "auto-ontology"] DETACH DELETE n;', '',
     'CREATE CONSTRAINT entity_uid IF NOT EXISTS FOR (n:Entity) REQUIRE n.uid IS UNIQUE;',
     `// re-runs: drop class labels set by an earlier run (a node's class may have changed)`,
     classes.length ? `MATCH (n:Entity) WHERE n._source IN ["graphloom", "auto-ontology"] REMOVE n:${classes.map(lbl).join(':')};` : '', ''];
-  for (const e of ents) { const p = nodeProps(e); L.push(`MERGE (n:Entity {uid: ${cyVal(p.uid)}}) SET n = {${Object.entries(p).map(([k, v]) => lbl(k) + ': ' + cyVal(v)).join(', ')}}, n:${lbl(typeOf(e))};`); }
+  for (const e of ents) { const p = nodeProps(e); L.push(`MERGE (n:Entity {uid: ${cyVal(p.uid)}}) ON CREATE SET n._source = "graphloom" WITH n WHERE n._source IN ["graphloom", "auto-ontology"] SET n = {${Object.entries(p).map(([k, v]) => lbl(k) + ': ' + cyVal(v)).join(', ')}}, n:${lbl(typeOf(e))};`); }
   L.push('');
-  for (const r of rels) { const a = S.ents.get(r.from), b = S.ents.get(r.to); const p = relProps(r); L.push(`MATCH (a:Entity {uid: ${cyVal(uidOf(a))}}), (b:Entity {uid: ${cyVal(uidOf(b))}}) MERGE (a)-[r:${lbl(r.type)}]->(b) SET r = {${Object.entries(p).map(([k, v]) => lbl(k) + ': ' + cyVal(v)).join(', ')}};`); }
+  for (const r of rels) { const a = S.ents.get(r.from), b = S.ents.get(r.to); const p = relProps(r); L.push(`MATCH (a:Entity {uid: ${cyVal(uidOf(a))}, _source: "graphloom"}), (b:Entity {uid: ${cyVal(uidOf(b))}, _source: "graphloom"}) MERGE (a)-[r:${lbl(r.type)}]->(b) SET r = {${Object.entries(p).map(([k, v]) => lbl(k) + ': ' + cyVal(v)).join(', ')}};`); }
   L.push('', '// Ontology as a meta-graph (optional)');
   for (const c of onto.classes.values()) L.push(`MERGE (:OntologyClass {name: ${cyVal(c.name)}, instances: ${c.count}, description: ${cyVal(c.desc || '')}});`);
   for (const c of onto.classes.values()) if (c.parent && onto.classes.has(c.parent)) L.push(`MATCH (a:OntologyClass {name: ${cyVal(c.name)}}), (b:OntologyClass {name: ${cyVal(c.parent)}}) MERGE (a)-[:SUBCLASS_OF]->(b);`);
@@ -3982,20 +4111,23 @@ async function pushNeo4j() {
   };
   try {
     const { ents, rels } = exportGraph();
-    say('Creating constraint…');
+    if ($('#neoReplace').checked && !confirm('This deletes every node tagged as created by graphLOOM in the selected database, not just this session’s. Continue?')) { say('Push cancelled — nothing was changed.'); return; }
+    say('Checking ownership and creating constraint…');
     await tx([{ statement: 'CREATE CONSTRAINT entity_uid IF NOT EXISTS FOR (n:Entity) REQUIRE n.uid IS UNIQUE' }]);
-    if ($('#neoReplace').checked) { await tx([{ statement: `MATCH (n:Entity) WHERE n._source IN $tags DETACH DELETE n`, parameters: { tags: OLD_TAGS } }]); say('✓ removed nodes from earlier pushes of this tool'); }
     const uids = ents.map(uidOf);
+    const collisions = await tx([{ statement: 'UNWIND $uids AS uid MATCH (n:Entity {uid: uid}) WHERE n._source IS NULL OR NOT n._source IN $tags RETURN count(n)', parameters: { uids, tags: OLD_TAGS } }]);
+    if ((collisions.results?.[0]?.data?.[0]?.row?.[0] || 0) > 0) throw new Error('UID collision with nodes not owned by graphLOOM. Push cancelled. Use a separate Neo4j database.');
+    if ($('#neoReplace').checked) { await tx([{ statement: `MATCH (n:Entity) WHERE n._source IN $tags DETACH DELETE n`, parameters: { tags: OLD_TAGS } }]); say('✓ removed nodes from earlier pushes of this tool'); }
     const lj = await tx([{ statement: 'CALL db.labels()' }]);
     const old = (lj.results?.[0]?.data || []).map(x => x.row[0]).filter(l => l !== 'Entity' && l !== 'OntologyClass');
-    if (old.length) for (let i = 0; i < uids.length; i += 1000) await tx([{ statement: `MATCH (n:Entity) WHERE n.uid IN $uids REMOVE n:${old.map(lbl).join(':')}`, parameters: { uids: uids.slice(i, i + 1000) } }]);
+    if (old.length) for (let i = 0; i < uids.length; i += 1000) await tx([{ statement: `MATCH (n:Entity) WHERE n.uid IN $uids AND n._source IN $tags REMOVE n:${old.map(lbl).join(':')}`, parameters: { uids: uids.slice(i, i + 1000), tags: OLD_TAGS } }]);
     const byT = new Map(); ents.forEach(e => { const t = typeOf(e); if (!byT.has(t)) byT.set(t, []); byT.get(t).push({ uid: uidOf(e), props: nodeProps(e) }); });
     for (const [t, rows] of byT) for (let i = 0; i < rows.length; i += 500) { await tx([{ statement: `UNWIND $rows AS row MERGE (n:Entity {uid: row.uid}) SET n = row.props SET n:${lbl(t)}`, parameters: { rows: rows.slice(i, i + 500) } }]); }
     say(`✓ ${ents.length} nodes`, 'ok');
     const keep = rels.map(r => uidOf(S.ents.get(r.from)) + '|' + r.type + '|' + uidOf(S.ents.get(r.to)));
     const byR = new Map(); rels.forEach(r => { if (!byR.has(r.type)) byR.set(r.type, []); byR.get(r.type).push({ from: uidOf(S.ents.get(r.from)), to: uidOf(S.ents.get(r.to)), props: relProps(r) }); });
-    for (const [t, rows] of byR) for (let i = 0; i < rows.length; i += 500) { await tx([{ statement: `UNWIND $rows AS row MATCH (a:Entity {uid: row.from}) MATCH (b:Entity {uid: row.to}) MERGE (a)-[r:${lbl(t)}]->(b) SET r = row.props`, parameters: { rows: rows.slice(i, i + 500) } }]); }
-    const st = await tx([{ statement: `MATCH (a:Entity)-[r]->(b:Entity) WHERE r._source IN $tags AND a.uid IN $uids AND b.uid IN $uids AND NOT (a.uid + '|' + type(r) + '|' + b.uid) IN $keep DELETE r RETURN count(*)`, parameters: { tags: OLD_TAGS, uids, keep } }]);
+    for (const [t, rows] of byR) for (let i = 0; i < rows.length; i += 500) { await tx([{ statement: `UNWIND $rows AS row MATCH (a:Entity {uid: row.from, _source: "graphloom"}) MATCH (b:Entity {uid: row.to, _source: "graphloom"}) MERGE (a)-[r:${lbl(t)}]->(b) SET r = row.props`, parameters: { rows: rows.slice(i, i + 500) } }]); }
+    const st = await tx([{ statement: `MATCH (a:Entity)-[r]->(b:Entity) WHERE a._source IN $tags AND b._source IN $tags AND r._source IN $tags AND a.uid IN $uids AND b.uid IN $uids AND NOT (a.uid + '|' + type(r) + '|' + b.uid) IN $keep DELETE r RETURN count(*)`, parameters: { tags: OLD_TAGS, uids, keep } }]);
     const stale = st.results?.[0]?.data?.[0]?.row?.[0] || 0;
     say(`✓ ${rels.length} relationships${stale ? ` · ${stale} stale relationship(s) from earlier pushes removed` : ''}`, 'ok');
     say('Done. In Neo4j Browser run: CALL db.schema.visualization()');
@@ -4006,7 +4138,7 @@ const WB_MARK = 'graphloom-workbook v1';
 const XL_MAX = 32000;
 const xlCell = v => v == null ? '' : Array.isArray(v) ? trunc(v.map(String).join(' | '), XL_MAX) : typeof v === 'object' ? trunc(JSON.stringify(v), XL_MAX) : typeof v === 'string' ? trunc(v, XL_MAX) : v;
 const ENT_META = ['UID', 'Name', 'Class', 'Class_Tier', 'Class_From', 'Mentions', 'Degree', 'Aliases', 'Sources', 'Extractors', 'Merged_From', 'Merge_Into_UID', 'Review_Status'];
-const REL_COLS = ['Subject_UID', 'Subject_Name', 'Subject_Class', 'Predicate', 'Object_UID', 'Object_Name', 'Object_Class', 'Weight', 'Confidence_Tier', 'Label_Confidence', 'Extractors', 'Properties', 'Sources', 'Evidence', 'Review_Status'];
+const REL_COLS = ['Subject_UID', 'Subject_Name', 'Subject_Class', 'Predicate', 'Object_UID', 'Object_Name', 'Object_Class', 'Weight', 'Confidence_Tier', 'Assertion', 'Label_Confidence', 'Extractors', 'Properties', 'Sources', 'Evidence', 'Review_Status'];
 function buildWorkbook() {
   const { ents: all, rels: allRels } = exportGraph();
   const ents = all.filter(e => !e.isDoc), rels = allRels.filter(r => r.type !== 'MENTIONS');
@@ -4062,7 +4194,7 @@ function buildWorkbook() {
   }) });
   sheets.push({ name: 'Relationships', header: REL_COLS, rows: rels.map(r => {
     const a = S.ents.get(r.from), b = S.ents.get(r.to);
-    return { Subject_UID: uidOf(a), Subject_Name: a.name, Subject_Class: typeOf(a), Predicate: r.type, Object_UID: uidOf(b), Object_Name: b.name, Object_Class: typeOf(b), Weight: r.weight, Confidence_Tier: r.tier || '', Label_Confidence: r.labelConf || '', Extractors: [...(r.extractors || [])].sort().join(' | '),
+    return { Subject_UID: uidOf(a), Subject_Name: a.name, Subject_Class: typeOf(a), Predicate: r.type, Object_UID: uidOf(b), Object_Name: b.name, Object_Class: typeOf(b), Weight: r.weight, Confidence_Tier: r.tier || '', Assertion: relAssertion(r), Label_Confidence: r.labelConf || '', Extractors: [...(r.extractors || [])].sort().join(' | '),
       Properties: xlCell(Object.entries(r.props || {}).filter(([k, v]) => v != null && v !== '').map(([k, v]) => `${k}=${Array.isArray(v) ? v.join(' | ') : v}`).join('; ')),
       Sources: [...(r.docs || [])].sort().join(' | '), Evidence: xlCell((r.evidence || []).map(ev => ev.text).join(' || ')), Review_Status: '' };
   }) });
@@ -4198,7 +4330,9 @@ function computeDiagnostics() {
     declared: D ? { classes: Object.keys(D.classes).length, relations: D.relations.length, instances_in_declared_classes_pct: pct(live.filter(e => D.classes[typeOf(e)]).length, live.length), relationships_using_declared_names_pct: pct(rels.filter(r => dn.has(r.type)).length, nonCo) } : null,
     merges: { ...S.diag.merges }, homonyms: S.diag.homonyms, uid_collisions: S.diag.uidCollisions, scoped_identifiers: S.diag.scopedIds,
     unknown_provenance: S.diag.unknownProv, tables: S.diag.tables, records: S.diag.records,
-    images: { ...S.diag.images }, chart: { ...S.diag.chart }, llm: S.diag.llm ? { ...S.diag.llm } : null
+    assertions: rels.reduce((acc, r) => { const a = relAssertion(r); if (a !== 'asserted') acc[a]++; return acc; }, { negated: 0, speculative: 0, historical: 0 }),
+    images: { ...S.diag.images }, chart: { ...S.diag.chart }, llm: S.diag.llm ? { ...S.diag.llm, nearby_support: S.diag.nearbyLLM || 0, no_predicate_cue: S.diag.noCueLLM || 0, negated: S.diag.negatedLLM || 0, speculative: S.diag.speculativeLLM || 0, unsupported_excluded: S.diag.unverifiedLLM || 0 } : null,
+    incomplete: !!S.diag.incomplete
   };
 }
 function renderDiagnostics() {
@@ -4221,13 +4355,15 @@ function renderDiagnostics() {
   if (g.images.ocr || g.images.vision) row('images: OCR · vision · vision skipped', `${g.images.ocr} · ${g.images.vision} · ${g.images.visionSkipped}`);
   if (g.chart.images) row('chart lines traced · unresolved', `${g.chart.links} · ${g.chart.unresolved}`, g.chart.unresolved ? 'warn' : 'good');
   if (g.llm) row('LLM chunks sent · capped · skipped docs', `${g.llm.sent} · ${g.llm.capped} · ${g.llm.structuredOnly}`, g.llm.capped ? 'warn' : '');
+  if (g.llm && (g.llm.nearby_support || g.llm.no_predicate_cue || g.llm.unsupported_excluded)) row('LLM links: nearby sentence · verb not found · no support (dropped)', `${g.llm.nearby_support} · ${g.llm.no_predicate_cue} · ${g.llm.unsupported_excluded}`, g.llm.unsupported_excluded ? 'warn' : '');
+  const asn = g.assertions; if (asn.negated || asn.speculative || asn.historical) row('stated as not true · possible · former', `${asn.negated} · ${asn.speculative} · ${asn.historical}`, '');
   row('provenance missing', g.unknown_provenance, g.unknown_provenance ? 'bad' : 'good');
   const top = Object.entries(g.by_extractor).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => `${k} ${v}`).join(' · ');
   S.dups = findDuplicates();
   const dupHtml = S.dups.length ? `<div class="dups"><div class="dh">Possible duplicates (${S.dups.length}) — same thing?</div>` + S.dups.map((d, i) =>
     `<div class="dup"><div><b>${esc(trunc(d.a.name, 34))}</b> ⇄ <b>${esc(trunc(d.b.name, 34))}</b><span>${esc(d.reason)}</span></div><div class="act"><button class="btn sm" data-dup="${i}" data-act="merge" title="Make them one entity (remembered for re-runs)">Merge</button><button class="btn sm" data-dup="${i}" data-act="apart" title="They are different — stop suggesting this pair">Keep apart</button></div></div>`).join('') + `</div>` : '';
   const outl = S.schema && S.schema.violations.length ? `<details class="dups"><summary class="dh" style="cursor:pointer">Links outside their usual domain → range (${S.schema.violations.length})</summary>` + S.schema.violations.slice(0, 12).map(v => `<div class="dup"><div><b>${esc(trunc(v.a, 28))}</b> <code>${esc(v.type)}</code> <b>${esc(trunc(v.b, 28))}</b><span>${esc(v.ta)} → ${esc(v.tb)}; usually ${esc(v.dom || 'any')} → ${esc(v.rng || 'any')}</span></div></div>`).join('') + `</details>` : '';
-  $('#diag').innerHTML = `<div class="dg">${rows.join('')}</div>${top ? `<div style="margin-top:6px;color:var(--text-3)">links by method: ${esc(top)}</div>` : ''}${outl}${g.chart.unresolved ? `<div class="w" style="margin-top:4px">Some chart connectors couldn't be matched to text — NIM vision can read those.</div>` : ''}${dupHtml}`;
+  $('#diag').innerHTML = `${g.incomplete ? `<div class="w" style="margin-bottom:6px">⚠ Incomplete: the LLM was sent only the first ${fmt(g.llm?.sent || LLM_MAX_CHUNKS)} of ${fmt(g.llm?.chunks || 0)} text chunks; the rest was not sent to it.</div>` : ''}<div class="dg">${rows.join('')}</div>${top ? `<div style="margin-top:6px;color:var(--text-3)">links by method: ${esc(top)}</div>` : ''}${outl}${g.chart.unresolved ? `<div class="w" style="margin-top:4px">Some chart connectors couldn't be matched to text — NIM vision can read those.</div>` : ''}${dupHtml}`;
 }
 $('#diag').addEventListener('click', e => { const b = e.target.closest('button[data-dup]'); if (b) decideDup(+b.dataset.dup, b.dataset.act); });
 
@@ -4682,6 +4818,46 @@ async function runSelfTest() {
     ok('certified term, synonyms and description survive the round trip', S.terms.get('C:Person')?.status === 'certified' && ['employee', 'staff'].every(x => S.terms.get('C:Person').syn.includes(x)) && S.terms.get('C:Person').desc === 'Someone in the org chart', JSON.stringify(S.terms.get('C:Person')));
     S.terms = new Map();
 
+    group = 'Assertion: negation, speculation, time';
+    const asCases = [
+      ['ACQUIRED', 'Quorvane Systems', 'Pellucid Fernworks', 'In May 2023, Quorvane Systems acquired Pellucid Fernworks.', 'asserted'],
+      ['ACQUIRED', 'Quorvane Systems', 'Pellucid Fernworks', 'Quorvane Systems did not acquire Pellucid Fernworks.', 'negated'],
+      ['ACQUIRED', 'Quorvane Systems', 'Pellucid Fernworks', 'Quorvane Systems may acquire Pellucid Fernworks next year.', 'speculative'],
+      ['ACQUIRED', 'Quorvane Systems', 'Pellucid Fernworks', 'If Quorvane Systems acquires Pellucid Fernworks, prices will rise.', 'speculative'],
+      ['ACQUIRED', 'Quorvane Systems', 'Pellucid Fernworks', 'Quorvane Systems is reportedly in talks to acquire Pellucid Fernworks.', 'speculative'],
+      ['ACQUIRED', 'Quorvane Systems', 'Pellucid Fernworks', 'Quorvane Systems acquired Pellucid Fernworks, a potential rival, without taking on debt.', 'asserted'],
+      ['ACQUIRED', 'Quorvane Systems', 'Pellucid Fernworks', 'Quorvane Systems acquired Pellucid Fernworks, not Glider Labs.', 'asserted'],
+      ['ACQUIRED', 'Quorvane Systems', 'Pellucid Fernworks', 'Quorvane Systems acquired Pellucid Fernworks in 2023.', 'asserted'],
+      ['WORKS_FOR', 'Ines Valcourt', 'Quorvane Systems', 'Ines Valcourt is the CEO of Quorvane Systems.', 'asserted'],
+      ['WORKS_FOR', 'Ines Valcourt', 'Quorvane Systems', 'Ines Valcourt formerly worked for Quorvane Systems.', 'asserted+hist'],
+      ['WORKS_FOR', 'Ines Valcourt', 'Quorvane Systems', 'Ines Valcourt no longer works for Quorvane Systems.', 'asserted+hist'],
+      ['LOCATED_IN', 'Quorvane Systems', 'Lisbon', 'Quorvane Systems has its main office in Lisbon.', 'asserted'],
+      ['OWNS', 'Marrowgate Capital', 'Kestrine Biolabs', 'Marrowgate Capital is well known in the town where Kestrine Biolabs sits.', 'nocue'],
+      ['ACQUIRED', 'Ann Lee', 'Beta Corp', 'Annual reports show Ann Lee acquired Beta Corp.', 'asserted']
+    ];
+    const asGot = ([pred, a, b, s]) => { const r = llmSupport(splitSentences(s), [a], [b], pred, {}); return !r ? 'null' : !r.cue && r.status === 'asserted' ? 'nocue' : r.status + (r.historical ? '+hist' : ''); };
+    const asBad = asCases.filter(c => asGot(c) !== c[4]);
+    ok(`LLM evidence check: ${asCases.length} sentences classified (negation, may/if/talks, month “May”, dates, “not X” after the verb, job titles, former roles, word-boundary cues)`, !asBad.length, asBad.map(c => `${asGot(c)} ≠ ${c[4]}: ${c[3]}`).join(' | '));
+    await load({ 'assert/a.txt': 'Varno Labs did not acquire Pellwick Systems. Bramble Aerospace may acquire Tolver Freight. Ines Corvo formerly worked for Kestril Biolabs. In May 2023, Marrow Capital acquired Glidden Works. Noor Hallam works for Kestril Biolabs.' });
+    S.viewData = computeView();
+    const asOf = (a, t, b) => { const r = relOf(a, t, b); return r ? relAssertion(r) : 'missing'; };
+    ok('built-in engine: “did not acquire” is kept as negated and hidden by default', asOf('Varno Labs', 'ACQUIRED', 'Pellwick Systems') === 'negated' && !S.viewData.full.rels.some(r => r.type === 'ACQUIRED' && S.ents.get(r.from).name === 'Varno Labs'), asOf('Varno Labs', 'ACQUIRED', 'Pellwick Systems'));
+    ok('built-in engine: “may acquire” → possible; “formerly worked” → former; “In May 2023 … acquired” → fact', asOf('Bramble Aerospace', 'ACQUIRED', 'Tolver Freight') === 'speculative' && asOf('Ines Corvo', 'WORKS_FOR', 'Kestril Biolabs') === 'historical' && asOf('Marrow Capital', 'ACQUIRED', 'Glidden Works') === 'asserted', ['Bramble Aerospace|ACQUIRED|Tolver Freight', 'Ines Corvo|WORKS_FOR|Kestril Biolabs', 'Marrow Capital|ACQUIRED|Glidden Works'].map(k => asOf(...k.split('|'))).join(', '));
+    ok('assertion travels to exports (JSON property, Excel column)', JSON.parse(toJSON()).relationships.some(r => r.properties.assertion === 'historical') && REL_COLS.includes('Assertion'));
+
+    group = 'Navigation, benchmark & export scope';
+    await load({ 'nav/org.txt': 'Nadia Kerr is the CEO of Zeta Corp. Omar Vance reports to Nadia Kerr. Lena Ortiz reports to Omar Vance. Theo Grant reports to Lena Ortiz. Nadia Kerr and Rita Shaw attended a dinner in Paris with Omar Vance and Ivan Holt.' });
+    S.viewData = computeView();
+    const navSeen = graphReach(E('Theo Grant').id, 4, S.viewData.full.rels), navPath = graphPath(navSeen, E('Nadia Kerr').id);
+    ok('shortest path follows real links (Theo → Lena → Omar → Nadia)', navPath && navPath.map(id => S.ents.get(id).name).join('>') === 'Theo Grant>Lena Ortiz>Omar Vance>Nadia Kerr', navPath && navPath.map(id => S.ents.get(id).name).join('>'));
+    ok('hop limit respected', graphPath(graphReach(E('Theo Grant').id, 1, S.viewData.full.rels), E('Nadia Kerr').id) === null);
+    ok('navigation skips hidden co-occurrence links', !S.viewData.full.rels.some(r => r.tier === 'co_occurrence'));
+    const bm = benchmarkScore({ entities: [{ name: 'Nadia Kerr', type: 'PER' }, { name: 'Zeta Corp', type: 'ORG' }, { name: 'Nobody Here', type: 'PER' }], relations: [{ source: 'Omar Vance', relation: 'reports to', target: 'Nadia Kerr' }, { source: 'Nadia Kerr', relation: 'MARRIED_TO', target: 'Omar Vance' }] });
+    ok('benchmark: ORG/PER labels, aliases and triples scored', bm.entities.tp === 2 && bm.typed_entities.tp === 2 && bm.triples.tp === 1 && Math.abs(bm.triples.recall - 0.5) < 1e-9, JSON.stringify(bm));
+    const jx = JSON.parse(toJSON());
+    ok('exports follow the view: no hidden co-occurrence or source-file links', jx.relationships.every(r => r.tier !== 'co_occurrence' && r.type !== 'MENTIONS') && jx.nodes.every(n => !n.labels.includes('SourceFile')));
+    ok('Cypher only overwrites nodes graphLOOM created', /ON CREATE SET n\._source = "graphloom" WITH n WHERE n\._source IN/.test(toCypher()));
+
     group = 'Re-layout';
     if (S.layout !== 'force') { S.layout = 'force'; $('#tLayout').textContent = 'Layout: force'; render(); await sleep(300); }
     if (S.settling) freezeLayout(true);
@@ -4835,6 +5011,106 @@ let rt;
 const rerender = () => { clearTimeout(rt); rt = setTimeout(() => { if (S.viewData) render(); }, 120); };
 [['#oMin', '#oMinV'], ['#oMax', '#oMaxV']].forEach(([i, o]) => $(i).addEventListener('input', () => { $(o).textContent = $(i).value; rerender(); }));
 ['#oTier', '#oDocs', '#oHier', '#oIso', '#oLbl', '#oColor', '#oClu'].forEach(s => $(s).addEventListener('change', rerender));
+
+function findGraphEntity(q) {
+  const key = norm(q); if (!key) return null;
+  const live = [...S.ents.values()].filter(e => !e.merged && !e.isDoc);
+  return live.find(e => norm(e.name) === key) || live.find(e => [...e.aliases].some(a => norm(a) === key)) || null;
+}
+function graphReach(startId, limit, rels) {
+  const adj = new Map();
+  for (const r of rels) {
+    if (r.type === 'MENTIONS' || r.from === r.to) continue;
+    if (!adj.has(r.from)) adj.set(r.from, []); if (!adj.has(r.to)) adj.set(r.to, []);
+    adj.get(r.from).push([r.to, r]); adj.get(r.to).push([r.from, r]);
+  }
+  const seen = new Map([[startId, { depth: 0, prev: null, rel: null }]]), queue = [startId];
+  for (let i = 0; i < queue.length; i++) {
+    const id = queue[i], cur = seen.get(id); if (cur.depth >= limit) continue;
+    for (const [next, r] of adj.get(id) || []) if (!seen.has(next)) { seen.set(next, { depth: cur.depth + 1, prev: id, rel: r }); queue.push(next); }
+  }
+  return seen;
+}
+function graphPath(seen, endId) {
+  if (!seen.has(endId)) return null;
+  const path = []; for (let id = endId; id != null; id = seen.get(id).prev) path.unshift(id);
+  return path;
+}
+function showNavFocus(focus, ids) {
+  S.focus = focus;
+  if (S.view !== 'kg') setView('kg'); else render();
+  setTimeout(() => { if (!network) return; const nodes = ids.map(id => 'E:' + id).filter(n => nodesDS.get(n)); if (!nodes.length) return; network.selectNodes(nodes); network.fit({ nodes, animation: { duration: 500 } }); }, S.view === 'kg' ? 400 : 1200);
+}
+function navigateGraph() {
+  const out = $('#navResults'); out.textContent = '';
+  if (!S.viewData) { out.textContent = 'Load files first.'; return; }
+  const startQ = $('#navStart').value.trim(), endQ = $('#navEnd').value.trim();
+  const a = findGraphEntity(startQ), b = endQ ? findGraphEntity(endQ) : null;
+  if (!a || (endQ && !b)) { out.textContent = `No entity named “${!a ? startQ : endQ}”. Pick a name from the suggestions.`; return; }
+  const limit = Number($('#navHops').value) || 2;
+  const seen = graphReach(a.id, limit, S.viewData.full.rels);
+  const name = id => S.ents.get(id)?.name || id;
+  if (b) {
+    const path = graphPath(seen, b.id);
+    if (!path) { out.textContent = `No path within ${limit} hop(s) using the links currently shown (Links shown → All includes weak co-occurrence links).`; return; }
+    out.textContent = path.map((id, i) => { if (!i) return name(id); const r = seen.get(id).rel; return (r.from === id ? ` ←${r.type}— ` : ` —${r.type}→ `) + name(id); }).join('');
+    showNavFocus({ kind: 'path', value: a.id, ids: path, label: `Path: ${name(a.id)} → ${name(b.id)} (${path.length - 1} hop${path.length > 2 ? 's' : ''})` }, path);
+  } else {
+    const matches = [...seen.entries()].filter(([id]) => id !== a.id).sort((x, y) => x[1].depth - y[1].depth || (name(x[0]) < name(y[0]) ? -1 : 1));
+    out.textContent = `${matches.length} entities within ${limit} hop(s) of ${name(a.id)}:\n` + matches.slice(0, 100).map(([id, v]) => `${v.depth} · ${name(id)}`).join('\n') + (matches.length > 100 ? `\n… ${matches.length - 100} more` : '');
+    const ids = [a.id, ...matches.slice(0, 300).map(([id]) => id)];
+    showNavFocus({ kind: 'set', value: a.id, ids, label: `Within ${limit} hop(s) of “${name(a.id)}”` }, ids);
+  }
+}
+$('#navGo').onclick = navigateGraph;
+$('#navStart').addEventListener('keydown', e => { if (e.key === 'Enter') navigateGraph(); });
+$('#navEnd').addEventListener('keydown', e => { if (e.key === 'Enter') navigateGraph(); });
+$('#navClear').onclick = () => { S.focus = null; $('#navResults').textContent = ''; if (S.viewData) render(); };
+
+const GOLD_CLASS = { per: 'Person', person: 'Person', org: 'Organization', organisation: 'Organization', organization: 'Organization', company: 'Organization', loc: 'Location', gpe: 'Location', location: 'Location', place: 'Location', misc: 'Concept', product: 'Product', event: 'Event' };
+const goldClass = t => { const k = String(t || '').trim().toLowerCase(); return GOLD_CLASS[k] || classFromWord(k) || 'Concept'; };
+function benchmarkScore(gold) {
+  if (!Array.isArray(gold?.entities) || !Array.isArray(gold?.relations)) throw new Error('Expected "entities" and "relations" arrays');
+  const v = S.viewData || computeView();
+  const live = v.full.ents.filter(e => !e.isDoc), byName = new Map();
+  for (const e of live) for (const n of [e.name, ...e.aliases]) { const k = norm(n); if (k && !byName.has(k)) byName.set(k, e); }
+  const prf = (tp, predicted, expected) => { const p = predicted ? tp / predicted : 0, r = expected ? tp / expected : 0; return { tp, precision: p, recall: r, f1: p + r ? 2 * p * r / (p + r) : 0 }; };
+  const foundE = new Set(), typedE = new Set();
+  for (const g of gold.entities) {
+    const e = byName.get(norm(g.name)); if (!e) continue;
+    foundE.add(e.id);
+    const gc = goldClass(g.type || g.class), pc = typeOf(e);
+    if (pc === gc || isA(pc, gc)) typedE.add(e.id);
+  }
+  const relKey = (from, type, to) => SYMMETRIC.has(type) && from > to ? `${to}|${type}|${from}` : `${from}|${type}|${to}`;
+  const predR = new Set(v.full.rels.filter(r => r.type !== 'MENTIONS').map(r => relKey(r.from, r.type, r.to)));
+  let tpR = 0, unresolved = 0;
+  for (const g of gold.relations) {
+    const a = byName.get(norm(g.source)), b = byName.get(norm(g.target)), t = upperSnake(g.relation || g.type || '');
+    if (!a || !b) { unresolved++; continue; }
+    if (predR.has(relKey(a.id, t, b.id))) tpR++;
+  }
+  return {
+    entities: prf(foundE.size, live.length, gold.entities.length),
+    typed_entities: prf(typedE.size, live.length, gold.entities.length),
+    triples: prf(tpR, predR.size, gold.relations.length),
+    unresolved_gold_triples: unresolved
+  };
+}
+$('#benchmarkBtn').onclick = () => $('#benchmarkFile').click();
+$('#benchmarkFile').onchange = async e => {
+  const file = e.target.files?.[0]; if (!file) return;
+  const out = $('#benchmarkOut');
+  try {
+    const s = benchmarkScore(JSON.parse(await file.text()));
+    const line = (label, x) => `${label}: precision ${(100 * x.precision).toFixed(1)}% · recall ${(100 * x.recall).toFixed(1)}% · F1 ${(100 * x.f1).toFixed(1)}% (${x.tp} matched)`;
+    out.textContent = [line('Entities (name or alias)', s.entities), line('Entities with the right class', s.typed_entities), line('Triples', s.triples),
+      s.unresolved_gold_triples ? `${s.unresolved_gold_triples} reference triple(s) name an entity the graph doesn't have` : '',
+      'Scored against the links currently shown; names match on normalised name or alias, classes on synonym or subclass (ORG = Organization, Partner ⊂ Organization), symmetric links in either direction.'].filter(Boolean).join('\n');
+  } catch (err) { out.textContent = 'Benchmark failed: ' + err.message; }
+  finally { e.target.value = ''; }
+};
+
 $('#selfTest').onclick = () => runSelfTest();
 $('#chipX').onclick = () => { S.focus = null; render(); };
 $('#tFit').onclick = () => network && network.fit({ animation: { duration: 500 } });
