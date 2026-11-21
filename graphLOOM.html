@@ -173,6 +173,16 @@ aside.right{border-left:1px solid var(--border)}
 aside.right{position:relative}
 .details h2{padding-right:30px}
 .close-details{position:absolute;top:10px;right:10px;z-index:2}
+.fs-only,.fs-only-btn{display:none}
+.stage.fs .fs-only-btn{display:inline-flex}
+.stage.fs .fs-only{display:inline-flex;gap:0}
+.fs-only .btn{border-radius:0}.fs-only .btn:first-child{border-radius:8px 0 0 8px}.fs-only .btn:last-child{border-radius:0 8px 8px 0;margin-left:-1px}
+.fs-only .btn.on{background:var(--text);color:var(--panel);border-color:var(--text)}
+.stage.fs{background:var(--canvas)}
+.stage.focus{position:fixed;inset:0;z-index:50}
+.stage.fs aside.right{position:absolute;right:12px;top:52px;bottom:60px;width:min(360px,calc(100% - 24px));border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);z-index:15;overflow:auto;display:block}
+.stage.fs aside.right > *{min-width:0}
+.main.no-right .stage.fs aside.right{display:none}
 .howto summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;border-radius:6px}
 .howto summary::-webkit-details-marker{display:none}
 .howto summary h4{margin:0}
@@ -260,7 +270,7 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
         <li>Click legend items to hide classes; <b>Min mentions</b> / <b>Max graph nodes</b> de-clutter big corpora.</li>
         <li>Export to Cypher, Excel or Neo4j — in Neo4j, <code>CALL db.schema.visualization()</code> shows the same ontology.</li>
       </ol>
-      <div class="keys"><kbd>[</kbd> settings · <kbd>]</kbd> details · <kbd>O</kbd>/<kbd>K</kbd> views · <kbd>/</kbd> search · <kbd>?</kbd> this help<br>scroll or <kbd>+</kbd>/<kbd>−</kbd> zoom · drag the background to move · <kbd>0</kbd> fit</div>
+      <div class="keys"><kbd>[</kbd> settings · <kbd>]</kbd> details · <kbd>O</kbd>/<kbd>K</kbd> views · <kbd>/</kbd> search · <kbd>?</kbd> this help<br>scroll or <kbd>+</kbd>/<kbd>−</kbd> zoom · drag the background to move · <kbd>0</kbd> fit · <kbd>F</kbd> full screen · <kbd>S</kbd> snapshot</div>
     </div>
   </div>
 </header>
@@ -341,11 +351,14 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
   <div class="mode-badge" id="badge" style="display:none"></div>
   <div class="stats" id="stats" style="display:none"></div>
   <div class="tools" id="tools" style="display:none">
+    <span class="fs-only" role="tablist" aria-label="View"><button class="btn sm" id="tOnto" title="Ontology  ( O )">Ontology</button><button class="btn sm" id="tKG" title="Knowledge graph  ( K )">Knowledge graph</button></span>
     <button class="btn sm" id="tZoomIn" title="Zoom in  ( + )  — or scroll; drag the background to move around" aria-label="Zoom in">＋</button>
     <button class="btn sm" id="tZoomOut" title="Zoom out  ( − )" aria-label="Zoom out">−</button>
     <button class="btn sm" id="tFit" title="Fit to screen  ( 0 )">⤢ Fit</button>
     <button class="btn sm" id="tLayout" title="Switch layout">Layout: force</button>
     <button class="btn sm" id="tPhys" title="Run the force layout again for a few seconds, then freeze">⟳ Re-layout</button>
+    <button class="btn sm fs-only-btn" id="tSnap" title="Save this view as a PNG  ( S )">⤓ Snapshot</button>
+    <button class="btn sm" id="tFull" title="Full screen  ( F )" aria-pressed="false">⛶ Full screen</button>
   </div>
   <div class="toast" id="toast"></div>
   <div class="busy" id="busy"><div class="spin"></div><span id="busyTxt">Processing…</span></div>
@@ -3509,7 +3522,7 @@ function clearHighlight() {
 function setView(v) {
   if (v === S.view) return;
   const prev = S.view; S.view = v;
-  $('#vOnto').classList.toggle('on', v === 'ontology'); $('#vKG').classList.toggle('on', v === 'kg');
+  markView();
   if (!network || !S.viewData) { renderBadge(); return; }
   const pos = network.getPositions();
   const seeds = {};
@@ -3524,6 +3537,29 @@ function setView(v) {
   render(Object.keys(seeds).length ? seeds : undefined);
   showHelp();
 }
+function markView() { for (const [a, b, v] of [['#vOnto', '#tOnto', 'ontology'], ['#vKG', '#tKG', 'kg']]) { $(a).classList.toggle('on', S.view === v); $(b).classList.toggle('on', S.view === v); $(b).setAttribute('aria-selected', String(S.view === v)); } }
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+function setFull(on) {
+  const st = $('.stage');
+  if (on) {
+    const req = st.requestFullscreen || st.webkitRequestFullscreen;
+    if (!req) { applyFull(true, 'focus'); return; }
+    const fb = setTimeout(() => { if (!fsEl() && !S.full) applyFull(true, 'focus'); }, 700);
+    try { Promise.resolve(req.call(st)).then(() => clearTimeout(fb), () => { clearTimeout(fb); if (!S.full) applyFull(true, 'focus'); }); } catch { clearTimeout(fb); applyFull(true, 'focus'); }
+  } else if (fsEl()) { try { Promise.resolve((document.exitFullscreen || document.webkitExitFullscreen).call(document)).catch(() => applyFull(false)); } catch { applyFull(false); } }
+  else applyFull(false);
+}
+function applyFull(on, mode = 'native') {
+  const st = $('.stage'), ar = $('aside.right');
+  S.full = on ? mode : null;
+  st.classList.toggle('fs', on); st.classList.toggle('focus', on && mode === 'focus');
+  if (on && ar.parentElement !== st) st.appendChild(ar); else if (!on && ar.parentElement === st) st.after(ar);
+  const b = $('#tFull'); b.textContent = on ? '✕ Exit full screen' : '⛶ Full screen'; b.title = on ? 'Exit full screen  ( F or Esc )' : 'Full screen  ( F )'; b.setAttribute('aria-pressed', String(!!on));
+  if (!network) return;
+  const refit = () => { network.setSize('100%', '100%'); network.redraw(); network.fit({ animation: { duration: 350 } }); };
+  requestAnimationFrame(() => requestAnimationFrame(refit)); setTimeout(refit, 220);
+}
+['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, () => { const on = fsEl() === $('.stage'); if (on || S.full === 'native') applyFull(on, 'native'); }));
 function setPanels({ left, right } = {}) {
   const m = $('.main');
   const before = [m.classList.contains('no-left'), m.classList.contains('no-right')].join();
@@ -3543,7 +3579,7 @@ function toast(html, ms = 3500) { const t = $('#toast'); t.innerHTML = html; t.c
 function exploreType(t) { S.focus = { kind: 'type', value: t }; if (S.view !== 'kg') setView('kg'); else render(); }
 function focusEntity(id) {
   id = R(id);
-  if (S.view !== 'kg') { S.view = 'kg'; $('#vOnto').classList.remove('on'); $('#vKG').classList.add('on'); }
+  if (S.view !== 'kg') { S.view = 'kg'; markView(); }
   const inView = S.viewData && S.viewData.kg.ents.some(e => e.id === id);
   if (!inView || S.view !== 'kg') { S.focus = { kind: 'entity', value: id }; render(); }
   setTimeout(() => { const nid = 'E:' + id; if (nodesDS.get(nid)) { revealNode(nid); network.selectNodes([nid]); network.focus(nid, { scale: 1.1, animation: { duration: 500 } }); highlight(nid); } showNode(nid); }, inView ? 0 : 900);
@@ -3883,6 +3919,38 @@ function toPNG() {
   const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
   const x = c.getContext('2d'); x.fillStyle = css('--canvas') || '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(src, 0, 0);
   const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = (S.view === 'ontology' ? 'ontology' : 'knowledge-graph') + '.png'; a.click();
+}
+function snapshotCanvas() {
+  const src = $('#graph canvas'); if (!src || !src.width) return null;
+  const k = src.width / (src.clientWidth || src.width);
+  const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+  const x = c.getContext('2d'); x.fillStyle = css('--canvas') || '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(src, 0, 0);
+  x.setTransform(k, 0, 0, k, 0, 0);
+  const font = getComputedStyle(document.body).fontFamily || 'system-ui, sans-serif';
+  const rr = (X, Y, W, H, r) => { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + W, Y, X + W, Y + H, r); x.arcTo(X + W, Y + H, X, Y + H, r); x.arcTo(X, Y + H, X, Y, r); x.arcTo(X, Y, X + W, Y, r); x.closePath(); };
+  const box = (X, Y, W, H) => { rr(X, Y, W, H, 8); x.fillStyle = css('--panel'); x.globalAlpha = 0.94; x.fill(); x.globalAlpha = 1; x.strokeStyle = css('--border'); x.lineWidth = 1; x.stroke(); };
+  const lg = $('#legend');
+  if (lg && lg.style.display !== 'none') {
+    const rows = [...lg.querySelectorAll('.lg:not(.off)')].map(el => ({ col: el.querySelector('i')?.style.background || '#999', name: [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim(), n: el.querySelector('.c')?.textContent || '' }));
+    if (rows.length) {
+      const title = (lg.querySelector('h4')?.textContent || '').replace(/\s*·\s*click to hide/i, '').toUpperCase();
+      x.font = `600 12px ${font}`; const wName = Math.max(...rows.map(r => x.measureText(r.name).width)); x.font = `600 10px ${font}`; const wT = x.measureText(title).width;
+      const W = Math.max(wName + 64, wT + 24, 150), H = 34 + rows.length * 20;
+      box(12, 12, W, H);
+      x.fillStyle = css('--text-3'); x.font = `600 10px ${font}`; x.textBaseline = 'middle'; x.fillText(title, 24, 28);
+      rows.forEach((r, i) => { const y = 48 + i * 20; x.beginPath(); x.arc(28, y, 5, 0, Math.PI * 2); x.fillStyle = r.col; x.fill(); x.fillStyle = css('--text'); x.font = `12px ${font}`; x.fillText(r.name, 40, y); x.fillStyle = css('--text-3'); x.font = `11px ${font}`; x.textAlign = 'right'; x.fillText(r.n, 12 + W - 12, y); x.textAlign = 'left'; });
+    }
+  }
+  const cap = `graphLOOM · ${S.view === 'ontology' ? 'Ontology' : 'Knowledge graph'} · ${$('#stats')?.textContent.trim() || ''}`.replace(/\s+·\s*$/, '');
+  x.font = `11px ${font}`; x.textBaseline = 'middle'; const cw = x.measureText(cap).width, ch = src.clientHeight || src.height / k;
+  box(12, ch - 38, cw + 20, 26); x.fillStyle = css('--text-2'); x.fillText(cap, 22, ch - 25);
+  return c;
+}
+function saveSnapshot() {
+  const c = snapshotCanvas(); if (!c) { log('Nothing to snapshot yet.', 'w'); return; }
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  const name = `graphloom-${S.view === 'ontology' ? 'ontology' : 'knowledge-graph'}-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.png`;
+  c.toBlob(b => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); toast(`Saved <b>${esc(name)}</b>`, 2500); }, 'image/png');
 }
 async function pushNeo4j() {
   const out = $('#neoLog'); out.textContent = '';
@@ -4591,6 +4659,17 @@ async function runSelfTest() {
     ok('certified term, synonyms and description survive the round trip', S.terms.get('C:Person')?.status === 'certified' && ['employee', 'staff'].every(x => S.terms.get('C:Person').syn.includes(x)) && S.terms.get('C:Person').desc === 'Someone in the org chart', JSON.stringify(S.terms.get('C:Person')));
     S.terms = new Map();
 
+    group = 'Full screen';
+    applyFull(true, 'focus');
+    ok('focus mode: graph area fills the window, details drawer inside it', $('.stage').classList.contains('focus') && $('aside.right').parentElement === $('.stage') && getComputedStyle($('.stage')).position === 'fixed');
+    ok('toolbar shows exit and the Ontology/KG switch', /Exit/.test($('#tFull').textContent) && getComputedStyle($('.fs-only')).display !== 'none' && $('#tFull').getAttribute('aria-pressed') === 'true');
+    const snap = snapshotCanvas(), gc = $('#graph canvas');
+    ok('snapshot button shown; PNG matches the full-screen canvas', getComputedStyle($('#tSnap')).display !== 'none' && snap && snap.width === gc.width && snap.height === gc.height && snap.toDataURL('image/png').length > 2000, snap && `${snap.width}x${snap.height}`);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    ok('Esc leaves focus mode and puts the details panel back', !S.full && !$('.stage').classList.contains('fs') && $('aside.right').previousElementSibling === $('.stage') && /Full screen/.test($('#tFull').textContent));
+    ok('view switch hidden outside full screen', getComputedStyle($('.fs-only')).display === 'none');
+    setView('ontology'); ok('view switch follows the current view', $('#tOnto').classList.contains('on') && !$('#tKG').classList.contains('on'));
+
     group = 'Routing';
     await load({ 'r/only-table.md': FIXTURES.orgMarkdown['org/llm-output.md'], 'r/prose.txt': FIXTURES.orgText1['org/v1.txt'] });
     const plan = planLLMJobs(S.docs.filter(d => d.text)).plan;
@@ -4671,7 +4750,7 @@ async function restoreSession() {
   try {
     S.docs = s.docs;
     if (s.layout) { S.layout = s.layout; $('#tLayout').textContent = 'Layout: ' + (S.layout === 'force' ? 'force' : 'hierarchy'); }
-    if (s.view) { S.view = s.view; $('#vOnto').classList.toggle('on', S.view === 'ontology'); $('#vKG').classList.toggle('on', S.view === 'kg'); }
+    if (s.view) { S.view = s.view; markView(); }
     if (s.decisions) S.dupDecisions = new Map(s.decisions);
     if (Array.isArray(s.terms)) S.terms = new Map(s.terms);
     renderFiles(); log(`Restored your last session: ${s.docs.length} file(s), saved ${new Date(s.savedAt).toLocaleString()}`, 'ok');
@@ -4729,6 +4808,11 @@ $('#tFit').onclick = () => network && network.fit({ animation: { duration: 500 }
 $('#tZoomIn').onclick = () => zoomBy(1.35);
 $('#tZoomOut').onclick = () => zoomBy(1 / 1.35);
 $('#tLayout').onclick = () => { S.layout = S.layout === 'force' ? 'hier' : 'force'; $('#tLayout').textContent = 'Layout: ' + (S.layout === 'force' ? 'force' : 'hierarchy'); render(); };
+$('#tFull').onclick = () => setFull(!S.full);
+$('#tSnap').onclick = () => saveSnapshot();
+$('#tOnto').onclick = () => setView('ontology');
+$('#tKG').onclick = () => setView('kg');
+markView();
 $('#tPhys').onclick = () => { if (!network) return; if (S.settling) freezeLayout(true); else settle(3000); };
 $('#q').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(e.target.value); });
 $('#q').addEventListener('change', e => doSearch(e.target.value));
@@ -4743,7 +4827,9 @@ document.addEventListener('keydown', e => {
   else if (e.key === '+' || e.key === '=') zoomBy(1.35);
   else if (e.key === '-' || e.key === '_') zoomBy(1 / 1.35);
   else if (e.key === '0') network && network.fit({ animation: { duration: 400 } });
-  else if (e.key === 'Escape') { if ($('#helpPop').classList.contains('pinned')) { setHelp(false); return; } clearHighlight(); network && network.unselectAll(); showHelp(); }
+  else if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) { if (S.viewData || S.full) setFull(!S.full); }
+  else if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey && !e.altKey) { if (S.viewData) saveSnapshot(); }
+  else if (e.key === 'Escape') { if ($('#helpPop').classList.contains('pinned')) { setHelp(false); return; } if (S.full === 'focus') { setFull(false); return; } clearHighlight(); network && network.unselectAll(); showHelp(); }
 });
 $('#exportMenu').addEventListener('click', e => {
   const b = e.target.closest('button[data-x]'); if (!b) return;
