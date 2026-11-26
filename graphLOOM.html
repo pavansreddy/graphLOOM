@@ -3510,7 +3510,12 @@ function renderTaxonomy() {
   const byType = new Map();
   for (const e of S.viewData.onto.ents) { if (e.merged) continue; const t = typeOf(e); if (!byType.has(t)) byType.set(t, []); byType.get(t).push(e); }
   const real = T.order.filter(n => onto.classes.has(n) && (byType.get(n) || []).length);
-  const per = Math.max(2, Math.min(8, Math.floor(Math.min(o.maxNodes, 260) / Math.max(1, real.length))));
+  const per = (() => {
+    const sizes = real.map(n => byType.get(n).length).sort((a, b) => a - b);
+    let left = o.maxNodes;
+    for (let i = 0; i < sizes.length; i++) { const share = Math.floor(left / (sizes.length - i)); if (sizes[i] > share) return Math.max(2, share); left -= sizes[i]; }
+    return Infinity;
+  })();
   const ink = css('--text'), ink2 = css('--text-2'), ink3 = css('--text-3'), panel = css('--panel'), panel2 = css('--panel-2'), focus = css('--focus');
   const box = (bg, border, extra = {}) => ({ shape: 'box', margin: { top: 6, bottom: 6, left: 10, right: 10 }, borderWidth: 1.5, shapeProperties: { borderRadius: 6 }, color: { background: bg, border, highlight: { background: bg, border: focus }, hover: { background: bg, border: focus } }, ...extra });
   const nodes = [], edges = [];
@@ -3849,7 +3854,7 @@ function renderStats() {
   const relTypes = new Set(onto.rels.filter(r => !WEAK.has(r.type)).map(r => r.type)).size;
   const X = S._tax;
   $('#stats').innerHTML = S.view === 'taxonomy' && X
-    ? `<b>${X.real}</b> classes${X.classes > X.real ? ` + ${X.classes - X.real} superclass(es)` : ''} · <b>${X.levels}</b> level(s) · <b>${X.top}</b> top-level · ${fmt(X.shown)} of ${fmt(X.all)} instances shown <span title="Best-connected instances per class; Max graph nodes raises the number">(up to ${X.per} per class)</span>`
+    ? `<b>${X.real}</b> classes${X.classes > X.real ? ` + ${X.classes - X.real} superclass(es)` : ''} · <b>${X.levels}</b> level(s) · <b>${X.top}</b> top-level · ${X.shown === X.all ? `all ${fmt(X.all)} instances shown` : `${fmt(X.shown)} of ${fmt(X.all)} instances shown <span title="The best-connected instances of the largest classes; raise Max graph nodes to show more">(up to ${fmt(X.per)} per class — raise Max graph nodes for more)</span>`}`
     : S.view === 'ontology'
     ? `<b>${onto.classes.size}</b> classes · <b>${relTypes}</b> relationship types · from ${files} file(s)`
     : `<b>${fmt(v.kg.ents.length)}</b> of ${fmt(v.full.ents.length)} entities · <b>${fmt(v.kg.rels.length)}</b> links (${fmt(typed)} typed)${v.isoHidden && !S.focus ? ` · <span title="Entities with no shown links — untick Hide isolated entities to see them">${fmt(v.isoHidden)} unlinked hidden</span>` : ''}${v.truncated ? ` · <span style="color:var(--warn)">top ${opts().maxNodes} shown</span>` : ''}${(() => { if (opts().cooccur) return ''; const n = [...S.rels.values()].filter(r => r.tier === 'co_occurrence').length; return n ? ` · <span title="Links shown → All to see them">${fmt(n)} weak co-occurrence links hidden</span>` : ''; })()}`;
