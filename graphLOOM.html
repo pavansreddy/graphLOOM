@@ -236,7 +236,8 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
     <div><b>graphLOOM</b><small>Ontology &amp; Knowledge Graph Explorer</small></div>
   </div>
   <div class="seg" role="tablist" aria-label="View">
-    <button id="vOnto" class="on" role="tab" title="Schema: classes and relationship types (shortcut: O)"><span class="dot"></span>Ontology</button>
+    <button id="vTax" class="on" role="tab" title="Classification tree: superclasses, classes and example instances (shortcut: T)"><span class="dot"></span>Taxonomy</button>
+    <button id="vOnto" role="tab" title="Schema: classes and relationship types (shortcut: O)"><span class="dot"></span>Ontology</button>
     <button id="vKG" role="tab" title="Instances: entities and relationships (shortcut: K)"><span class="dot"></span>Knowledge Graph</button>
   </div>
   <div class="spacer"></div>
@@ -264,6 +265,7 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
     <div class="help-pop" id="helpPop" role="dialog" aria-label="How to read this">
       <h4>How to read this</h4>
       <ol>
+        <li><b>Taxonomy</b> — the classification tree, read left to right: <i>Thing</i> → superclasses → classes → their best-connected instances. Each box sits under exactly one parent; <b>+ more</b> opens the rest of a class.</li>
         <li><b>Ontology</b> — each circle is a <i>class</i> (a Neo4j label); size = number of instances. Arrows are <i>relationship types</i> from domain → range. Grey dashed arrows are <code>SUBCLASS_OF</code>; dashed coloured arrows are relations a document declares.</li>
         <li><b>Knowledge graph</b> — each class expands into its entities, coloured by class; hubs grow with connections.</li>
         <li><b>Line styles</b> show the evidence, not the method — solid = <i>explicit</i> (stated in the source) · dash-dot = <i>derived</i> (computed from other facts, e.g. reporting lines, e-mail domains) · dashed = <i>inferred</i> (likely, not stated) · dotted = <i>co-occurrence</i> (hidden by default). A <b>?</b> after a name means the relationship is stated but its name was guessed from the verb. <i>(possible)</i> = stated as planned or uncertain, <i>(former)</i> = no longer true; statements that something is <i>not</i> the case appear only with <b>Links shown → All</b>, as <code>NOT …</code>. Filter with <b>Links shown</b>.</li>
@@ -271,7 +273,7 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
         <li>Click legend items to hide classes; <b>Min mentions</b> / <b>Max graph nodes</b> de-clutter big corpora.</li>
         <li>Export to Cypher, Excel or Neo4j — in Neo4j, <code>CALL db.schema.visualization()</code> shows the same ontology.</li>
       </ol>
-      <div class="keys"><kbd>[</kbd> settings · <kbd>]</kbd> details · <kbd>O</kbd>/<kbd>K</kbd> views · <kbd>/</kbd> search · <kbd>?</kbd> this help<br>scroll or <kbd>+</kbd>/<kbd>−</kbd> zoom · drag the background to move · <kbd>0</kbd> fit · <kbd>F</kbd> full screen · <kbd>S</kbd> snapshot</div>
+      <div class="keys"><kbd>[</kbd> settings · <kbd>]</kbd> details · <kbd>T</kbd>/<kbd>O</kbd>/<kbd>K</kbd> views · <kbd>/</kbd> search · <kbd>?</kbd> this help<br>scroll or <kbd>+</kbd>/<kbd>−</kbd> zoom · drag the background to move · <kbd>0</kbd> fit · <kbd>F</kbd> full screen · <kbd>S</kbd> snapshot</div>
     </div>
   </div>
 </header>
@@ -355,7 +357,7 @@ div.vis-tooltip{background:var(--panel)!important;color:var(--text)!important;bo
   <div class="mode-badge" id="badge" style="display:none"></div>
   <div class="stats" id="stats" style="display:none"></div>
   <div class="tools" id="tools" style="display:none">
-    <span class="fs-only" role="tablist" aria-label="View"><button class="btn sm" id="tOnto" title="Ontology  ( O )">Ontology</button><button class="btn sm" id="tKG" title="Knowledge graph  ( K )">Knowledge graph</button></span>
+    <span class="fs-only" role="tablist" aria-label="View"><button class="btn sm" id="tTax" title="Taxonomy  ( T )">Taxonomy</button><button class="btn sm" id="tOnto" title="Ontology  ( O )">Ontology</button><button class="btn sm" id="tKG" title="Knowledge graph  ( K )">Knowledge graph</button></span>
     <button class="btn sm" id="tZoomIn" title="Zoom in  ( + )  — or scroll; drag the background to move around" aria-label="Zoom in">＋</button>
     <button class="btn sm" id="tZoomOut" title="Zoom out  ( − )" aria-label="Zoom out">−</button>
     <button class="btn sm" id="tFit" title="Fit to screen  ( 0 )">⤢ Fit</button>
@@ -585,7 +587,7 @@ const PCT_RX = /\b\d+(?:\.\d+)?\s?%/;
 
 const S = {
   docs: [], ents: new Map(), rels: new Map(), alias: new Map(), seq: 0,
-  view: 'ontology', hidden: new Set(), focus: null, layout: 'force', frozen: false,
+  view: 'taxonomy', hidden: new Set(), focus: null, layout: 'force', frozen: false,
   llm: null, viewData: null, edgeData: new Map(), engineUsed: 'heur', diag: newDiag(), nsOf: new Map(), dupDecisions: new Map(), terms: new Map()
 };
 function resetStore() { S.ents = new Map(); S.rels = new Map(); S.alias = new Map(); S.seq = 0; S.llm = null; S.declared = null; S.focus = null; S.rejected = null; S.idIndex = null; S.pendingRefs = []; S._scholars = []; S._pos = new Map(); S.alignParents = {}; S.schema = null; S.diag = newDiag(); }
@@ -3404,7 +3406,7 @@ function nodeColor(c) { return { background: c, border: shade(c, -22), highlight
 let network, nodesDS, edgesDS;
 function initNetwork() {
   if (network) { try { network.destroy(); } catch (e) { } }
-  S._netLayout = S.layout;
+  const mode = S._netLayout = netMode();
   nodesDS = new vis.DataSet(); edgesDS = new vis.DataSet();
   network = new vis.Network($('#graph'), { nodes: nodesDS, edges: edgesDS }, {
     autoResize: true,
@@ -3412,10 +3414,13 @@ function initNetwork() {
     edges: { arrows: { to: { enabled: true, scaleFactor: 0.55 } }, selectionWidth: 1.5, hoverWidth: 0.6, smooth: { enabled: true, type: 'continuous', roundness: 0.2 } },
     physics: { solver: 'forceAtlas2Based', forceAtlas2Based: { gravitationalConstant: -70, centralGravity: 0.008, springLength: 130, springConstant: 0.06, damping: 0.5, avoidOverlap: 0.7 }, stabilization: { enabled: true, iterations: 250, fit: true }, maxVelocity: 40, minVelocity: 0.8, timestep: 0.4 },
     interaction: { hover: true, tooltipDelay: 180, zoomView: true, dragView: true, dragNodes: true, zoomSpeed: 1, keyboard: { enabled: true, bindToWindow: false }, multiselect: false, navigationButtons: false },
-    layout: S.layout === 'hier'
+    layout: mode === 'tax'
+      ? { improvedLayout: false, hierarchical: { enabled: true, direction: 'LR', sortMethod: 'directed', shakeTowards: 'roots', levelSeparation: 240, nodeSpacing: 38, treeSpacing: 56, blockShifting: true, edgeMinimization: true, parentCentralization: true } }
+      : mode === 'hier'
       ? { improvedLayout: false, hierarchical: { enabled: true, direction: 'UD', levelSeparation: 150, nodeSpacing: 150, treeSpacing: 140, blockShifting: true, edgeMinimization: true, parentCentralization: true } }
       : { improvedLayout: false }
   });
+  if (mode === 'tax') network.setOptions({ physics: { enabled: false } });
   network.on('dragEnd', p => { if (p.nodes && p.nodes.length) savePositions(); });
   network.on('click', p => {
     if (p.nodes.length && network.isCluster(p.nodes[0])) { toast('A collapsed community — <b>double-click</b> to open it', 2500); return; }
@@ -3428,6 +3433,8 @@ function initNetwork() {
     const id = p.nodes[0];
     if (network.isCluster(id)) { openCluster(id); return; }
     if (id.startsWith('C:')) exploreType(id.slice(2));
+    else if (id.startsWith('M:')) exploreType(id.slice(2));
+    else if (id.startsWith('E:') && S.view === 'taxonomy') focusEntity(id.slice(2));
     else if (id.startsWith('E:')) { S.focus = { kind: 'entity', value: id.slice(2) }; render(); }
   });
   let fitTimer;
@@ -3450,15 +3457,82 @@ function setPhysics(kind, n) {
           : { gravitationalConstant: big ? -45 : -70, centralGravity: 0.01, springLength: big ? 90 : 120, springConstant: 0.07, damping: 0.5, avoidOverlap: 0.6 } }
   });
 }
+const netMode = () => S.view === 'taxonomy' ? 'tax' : S.layout;
+const VIEW_NAME = { taxonomy: 'Taxonomy', ontology: 'Ontology', kg: 'Knowledge graph' };
+const VIEW_SLUG = { taxonomy: 'taxonomy', ontology: 'ontology', kg: 'knowledge-graph' };
 function render(seeds) {
-  if (!network || S._netLayout !== S.layout) initNetwork();
+  if (!network || S._netLayout !== netMode()) initNetwork();
   S.viewData = computeView();
   const has = S.viewData.full.ents.length > 0 || S.ents.size > 0;
   $('#empty').style.display = has ? 'none' : 'flex';
   ['#legend', '#stats', '#tools'].forEach(s => $(s).style.display = has ? '' : 'none');
   S._lastNodeSel = null;
-  if (S.view === 'ontology') renderOntology(seeds); else renderKG(seeds);
+  if (S.view === 'taxonomy') renderTaxonomy(); else if (S.view === 'ontology') renderOntology(seeds); else renderKG(seeds);
   renderLegend(); renderStats(); renderChip(); renderBadge();
+}
+function classParent(n, classes) {
+  const c = classes.get(n);
+  const p = c ? c.parent : (S.declared?.classes?.[n]?.parent || S.llm?.classes?.[n]?.parent || PARENT[n] || S.alignParents?.[n] || headParent(n) || null);
+  return p && p !== n ? p : null;
+}
+function taxTree(onto) {
+  const kids = new Map(), up = new Map(), placed = new Set();
+  const pending = [...onto.classes.keys()].filter(n => !S.hidden.has(n));
+  while (pending.length) {
+    const n = pending.pop(); if (placed.has(n) || n === 'Thing') continue; placed.add(n);
+    let p = classParent(n, onto.classes);
+    if (p && (S.hidden.has(p) || p === 'Thing')) p = null;
+    for (let q = p, seen = new Set([n]), g = 0; q && g < 16; q = classParent(q, onto.classes), g++) { if (seen.has(q)) { p = null; break; } seen.add(q); }
+    const at = p || 'Thing';
+    up.set(n, at); if (!kids.has(at)) kids.set(at, []); kids.get(at).push(n);
+    if (p && !placed.has(p)) pending.push(p);
+  }
+  const total = new Map(), sum = n => { if (total.has(n)) return total.get(n); const v = (onto.classes.get(n)?.count || 0) + (kids.get(n) || []).reduce((a, k) => a + sum(k), 0); total.set(n, v); return v; };
+  for (const [p, ks] of kids) ks.sort((a, b) => sum(b) - sum(a) || (a < b ? -1 : 1));
+  const depth = new Map([['Thing', 0]]), order = ['Thing'];
+  for (let i = 0; i < order.length; i++) for (const k of kids.get(order[i]) || []) { depth.set(k, depth.get(order[i]) + 1); order.push(k); }
+  return { kids, up, total, depth, order, sum };
+}
+function renderTaxonomy() {
+  const o = opts();
+  const onto = S.ontology = buildOntology(S.viewData.onto);
+  S.edgeData.clear();
+  const T = taxTree(onto), deg = S.viewData.deg;
+  const byType = new Map();
+  for (const e of S.viewData.onto.ents) { if (e.merged) continue; const t = typeOf(e); if (!byType.has(t)) byType.set(t, []); byType.get(t).push(e); }
+  const real = T.order.filter(n => onto.classes.has(n) && (byType.get(n) || []).length);
+  const per = Math.max(2, Math.min(8, Math.floor(Math.min(o.maxNodes, 260) / Math.max(1, real.length))));
+  const ink = css('--text'), ink2 = css('--text-2'), ink3 = css('--text-3'), panel = css('--panel'), panel2 = css('--panel-2'), focus = css('--focus');
+  const box = (bg, border, extra = {}) => ({ shape: 'box', margin: { top: 6, bottom: 6, left: 10, right: 10 }, borderWidth: 1.5, shapeProperties: { borderRadius: 6 }, color: { background: bg, border, highlight: { background: bg, border: focus }, hover: { background: bg, border: focus } }, ...extra });
+  const nodes = [], edges = [];
+  const link = (from, to, title, t) => edges.push({ id: 'X:' + to, from, to, title, _t: t, arrows: { to: { enabled: false } }, width: 1.2, color: { color: ink3, opacity: 0.7 }, font: edgeFont(), smooth: { enabled: true, type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.5 } });
+  nodes.push({ id: 'T:Thing', level: 0, label: `*Thing*\n${fmt(T.sum('Thing'))}`, title: 'Thing — the root of the taxonomy\nEvery class below is a kind of Thing', ...box(ink, ink, { font: { multi: 'markdown', size: 14, color: css('--canvas'), bold: { size: 15, color: css('--canvas') } } }) });
+  let shown = 0, all = 0;
+  for (const n of T.order.slice(1)) {
+    const c = onto.classes.get(n), lv = T.depth.get(n), pid = T.up.get(n) === 'Thing' ? 'T:Thing' : 'C:' + T.up.get(n);
+    const sub = T.kids.get(n)?.length || 0, tot = T.sum(n);
+    if (c) {
+      const col = colorFor(n);
+      nodes.push({ id: 'C:' + n, level: lv, label: `*${n}*${c.status === 'certified' ? ' ✓' : ''}  ${fmt(c.count)}${sub ? `  (Σ ${fmt(tot)})` : ''}`, title: classTitle(c) + (sub ? `\n${sub} subclass(es) · ${fmt(tot)} instance(s) including subclasses` : ''),
+        ...box(col, shade(col, -22), { font: { multi: 'markdown', size: 13, color: inkOn(col), bold: { size: 13, color: inkOn(col) } } }), ...(isExtraClass(n) ? { shapeProperties: { borderRadius: 6, borderDashes: [5, 3] }, borderWidth: 2 } : {}) });
+    } else nodes.push({ id: 'C:' + n, level: lv, _abstract: true, label: `${n}  ${fmt(tot)}`, title: `${n} (abstract superclass)\n${sub} subclass(es) · ${fmt(tot)} instance(s)`, ...box(panel2, ink3, { shapeProperties: { borderRadius: 6, borderDashes: [4, 3] }, font: { size: 12, color: ink2 } }) });
+    link(pid, 'C:' + n, `${n} is a kind of ${T.up.get(n)}`, 'SUBCLASS_OF');
+    const list = (byType.get(n) || []).slice().sort((a, b) => ((deg.get(b.id) || 0) * 2 + b.mentions) - ((deg.get(a.id) || 0) * 2 + a.mentions) || (a.name < b.name ? -1 : 1));
+    all += list.length;
+    const col = colorFor(n);
+    for (const e of list.slice(0, per)) {
+      shown++;
+      nodes.push({ id: 'E:' + e.id, level: lv + 1, label: trunc(e.name, 30), title: `${e.name}\n:${n}  ·  ${deg.get(e.id) || 0} link(s)  ·  ${e.mentions} mention(s)\nDouble-click to open it in the knowledge graph`, ...box(panel, col, { borderWidth: 2, margin: { top: 4, bottom: 4, left: 8, right: 8 }, font: { size: 11, color: ink } }) });
+      link('C:' + n, 'E:' + e.id, `${e.name} is an instance of ${n}`, 'INSTANCE_OF');
+    }
+    if (list.length > per) {
+      nodes.push({ id: 'M:' + n, level: lv + 1, label: `+ ${fmt(list.length - per)} more`, title: `Double-click to explore all ${fmt(list.length)} ${n} instance(s) in the knowledge graph`, ...box(panel2, css('--border'), { borderWidth: 1, margin: { top: 4, bottom: 4, left: 8, right: 8 }, shapeProperties: { borderRadius: 6, borderDashes: [3, 3] }, font: { size: 11, color: ink2, face: 'system-ui', ital: { color: ink2 } } }) });
+      link('C:' + n, 'M:' + n, `${fmt(list.length - per)} more ${n} instance(s)`, 'INSTANCE_OF');
+    }
+  }
+  edges.forEach(e => { e._c = e.color; e._f = e.font; });
+  S._tax = { kids: T.kids, classes: T.order.length - 1, real: T.order.filter(n => onto.classes.has(n)).length, levels: Math.max(0, ...T.depth.values()), top: (T.kids.get('Thing') || []).length, shown, all, per };
+  swapData(nodes, edges, 'tax', false);
 }
 function renderOntology(seeds) {
   const o = opts();
@@ -3566,13 +3640,22 @@ function hierLevels(nodes, edges) {
 }
 const posKey = nid => { if (!String(nid).startsWith('E:')) return nid; const e = S.ents.get(R(nid.slice(2))); return e ? 'U:' + uidOf(e) : nid; };
 function savePositions() {
-  if (!network || !S._kind || S.settling || S._clustered) return;
+  if (!network || !S._kind || S._kind === 'tax' || S.settling || S._clustered) return;
   const o = {}; for (const [k, v] of Object.entries(network.getPositions())) o[posKey(k)] = v;
   (S._pos ||= new Map()).set(S._kind + '|' + S.layout, o);
   saveSession();
 }
 function swapData(nodes, edges, kind, seeded) {
   network.setSize('100%', '100%'); network.redraw();
+  if (kind === 'tax') {
+    S.gen = (S.gen || 0) + 1; S.settling = false; S._stabilizing = false; clearTimeout(S._settleT); S._fitPending = false; S._kind = kind;
+    network.setOptions({ physics: { enabled: false }, nodes: { scaling: { label: { drawThreshold: 4, maxVisible: 30 } } } });
+    nodesDS.clear(); edgesDS.clear(); nodesDS.add(nodes); edgesDS.add(edges);
+    network.setData({ nodes: nodesDS, edges: edgesDS });
+    updatePhysBtn();
+    setTimeout(() => network.fit({ animation: { duration: 350 } }), 30);
+    return;
+  }
   setPhysics(kind, nodes.length);
   nodesDS.clear(); edgesDS.clear();
   S._fitPending = false; S._kind = kind;
@@ -3602,6 +3685,7 @@ function swapData(nodes, edges, kind, seeded) {
 }
 function relayout() {
   if (!network) return;
+  if (S._kind === 'tax') { render(); return; }
   if (S.settling) { freezeLayout(true); return; }
   if (S.layout === 'hier') { S._pos?.delete(S._kind + '|hier'); render(); return; }
   const pos = network.getPositions(), ids = Object.keys(pos); if (!ids.length) return;
@@ -3679,11 +3763,14 @@ function setView(v) {
     for (const id in pos) if (id.startsWith('E:')) { const e = S.ents.get(id.slice(2)); if (!e) continue; const t = typeOf(e); (acc[t] ||= { x: 0, y: 0, n: 0 }); acc[t].x += pos[id].x; acc[t].y += pos[id].y; acc[t].n++; }
     for (const t in acc) seeds[t] = { x: acc[t].x / acc[t].n, y: acc[t].y / acc[t].n };
   }
-  if (v === 'ontology') S.focus = null;
+  if (v !== 'kg') S.focus = null;
   render(Object.keys(seeds).length ? seeds : undefined);
   showHelp();
 }
-function markView() { for (const [a, b, v] of [['#vOnto', '#tOnto', 'ontology'], ['#vKG', '#tKG', 'kg']]) { $(a).classList.toggle('on', S.view === v); $(b).classList.toggle('on', S.view === v); $(b).setAttribute('aria-selected', String(S.view === v)); } }
+function markView() {
+  for (const [a, b, v] of [['#vTax', '#tTax', 'taxonomy'], ['#vOnto', '#tOnto', 'ontology'], ['#vKG', '#tKG', 'kg']]) { $(a).classList.toggle('on', S.view === v); $(a).setAttribute('aria-selected', String(S.view === v)); $(b).classList.toggle('on', S.view === v); $(b).setAttribute('aria-selected', String(S.view === v)); }
+  const tl = $('#tLayout'); tl.disabled = S.view === 'taxonomy'; tl.title = S.view === 'taxonomy' ? 'The taxonomy is always a left-to-right tree' : '';
+}
 const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
 function setFull(on) {
   const st = $('.stage');
@@ -3743,7 +3830,7 @@ function renderLegend() {
     $('#legend').innerHTML = `<h4>Communities · named after their hub</h4>` + cs.map(c => `<div class="lg" style="cursor:default"><i style="background:${communityColor(c.id)}"></i>${esc(trunc(c.label, 26))}<span class="c">${fmt(c.size)}</span></div>`).join('') + (rest.length ? `<div class="lg" style="cursor:default"><i style="background:${communityColor(0)}"></i>Other (${rest.length} smaller groups)<span class="c">${fmt(rest.reduce((a, c) => a + c.size, 0))}</span></div>` : '');
     return;
   }
-  $('#legend').innerHTML = `<h4>${S.view === 'ontology' ? 'Classes' : 'Entity types'} · click to hide</h4>` + rows.map(([t, c]) =>
+  $('#legend').innerHTML = `<h4>${S.view === 'kg' ? 'Entity types' : 'Classes'} · click to hide</h4>` + rows.map(([t, c]) =>
     `<div class="lg ${S.hidden.has(t) ? 'off' : ''}" data-t="${esc(t)}"><i class="${isExtraClass(t) ? 'extra' : ''}" style="background:${colorFor(t)}"></i>${esc(t)}<span class="c">${fmt(c)}</span></div>`).join('');
 }
 function renderStats() {
@@ -3751,7 +3838,10 @@ function renderStats() {
   const files = S.docs.filter(d => !d.skip && !d.err).length;
   const typed = v.full.rels.filter(r => !WEAK.has(r.type)).length;
   const relTypes = new Set(onto.rels.filter(r => !WEAK.has(r.type)).map(r => r.type)).size;
-  $('#stats').innerHTML = S.view === 'ontology'
+  const X = S._tax;
+  $('#stats').innerHTML = S.view === 'taxonomy' && X
+    ? `<b>${X.real}</b> classes${X.classes > X.real ? ` + ${X.classes - X.real} superclass(es)` : ''} · <b>${X.levels}</b> level(s) · <b>${X.top}</b> top-level · ${fmt(X.shown)} of ${fmt(X.all)} instances shown <span title="Best-connected instances per class; Max graph nodes raises the number">(up to ${X.per} per class)</span>`
+    : S.view === 'ontology'
     ? `<b>${onto.classes.size}</b> classes · <b>${relTypes}</b> relationship types · from ${files} file(s)`
     : `<b>${fmt(v.kg.ents.length)}</b> of ${fmt(v.full.ents.length)} entities · <b>${fmt(v.kg.rels.length)}</b> links (${fmt(typed)} typed)${v.isoHidden && !S.focus ? ` · <span title="Entities with no shown links — untick Hide isolated entities to see them">${fmt(v.isoHidden)} unlinked hidden</span>` : ''}${v.truncated ? ` · <span style="color:var(--warn)">top ${opts().maxNodes} shown</span>` : ''}${(() => { if (opts().cooccur) return ''; const n = [...S.rels.values()].filter(r => r.tier === 'co_occurrence').length; return n ? ` · <span title="Links shown → All to see them">${fmt(n)} weak co-occurrence links hidden</span>` : ''; })()}`;
 }
@@ -3763,7 +3853,9 @@ function renderChip() {
 function renderBadge() {
   const b = $('#badge'); if (!S.viewData) { b.style.display = 'none'; return; }
   b.style.display = '';
-  b.innerHTML = S.view === 'ontology'
+  b.innerHTML = S.view === 'taxonomy'
+    ? `<b>Taxonomy</b> · classification tree: Thing → superclasses → classes → instances`
+    : S.view === 'ontology'
     ? `<b>Ontology</b> · schema induced ${S.engineUsed === 'llm' ? 'by NVIDIA NIM' : 'automatically from instances'}`
     : `<b>Knowledge graph</b> · ${S.engineUsed === 'llm' ? 'LLM-extracted' : 'pattern-extracted'} triples`;
 }
@@ -3778,10 +3870,24 @@ function relRow(dir, type, other, n, attrs, tier) {
 const tierBadge = t => `<span class="tier ${esc(t || 'none')}">${esc(t || '?')}</span>`;
 function showNode(nid) {
   const d = $('#details'); setPanels({ right: true });
+  const subsOf = name => S.view === 'taxonomy' && S._tax?.kids.get(name) || [...(S.ontology?.classes.values() || [])].filter(x => x.parent === name).map(x => x.name);
+  if (nid.startsWith('T:')) {
+    const top = subsOf('Thing');
+    d.innerHTML = `<span class="pill" style="background:var(--text);color:var(--canvas)">Root</span><h2>Thing</h2><p class="muted">The top of the taxonomy. Every class is a kind of Thing; read the tree left to right from general to specific.</p>
+      <table class="kv" style="margin-top:10px"><tr><td>classes</td><td>${fmt(S._tax?.real || 0)}</td></tr><tr><td>levels</td><td>${fmt(S._tax?.levels || 0)}</td></tr><tr><td>instances</td><td>${fmt(S._tax?.all || 0)}</td></tr></table>
+      ${top.length ? `<h4>Top-level classes</h4><div class="chips">${top.map(n => `<button data-tax="${esc(n)}">${esc(n)}</button>`).join('')}</div>` : ''}`;
+    return;
+  }
+  if (nid.startsWith('M:')) {
+    const name = nid.slice(2), c = S.ontology?.classes.get(name);
+    d.innerHTML = `<span class="pill" style="background:var(--panel-2);color:var(--text-2)">More instances</span><h2>${esc(name)}</h2><p class="muted">The taxonomy lists the best-connected instances of each class. The knowledge graph shows all of them with their links.</p>
+      <div style="margin-top:16px"><button class="btn primary" data-explore="${esc(name)}">Explore all ${fmt(c?.count || 0)} ${esc(name)} instance(s) →</button></div>`;
+    return;
+  }
   if (nid.startsWith('C:')) {
     const name = nid.slice(2); const onto = S.ontology; const c = onto?.classes.get(name);
     const col = colorFor(name);
-    if (!c) { d.innerHTML = `<span class="pill" style="background:var(--panel-2);color:var(--text-2)">Abstract class</span><h2>${esc(name)}</h2><p class="muted">A superclass grouping: ${[...(onto?.classes.values() || [])].filter(x => x.parent === name).map(x => esc(x.name)).join(', ')}.</p>`; return; }
+    if (!c) { d.innerHTML = `<span class="pill" style="background:var(--panel-2);color:var(--text-2)">Abstract class</span><h2>${esc(name)}</h2><p class="muted">A superclass grouping: ${subsOf(name).map(esc).join(', ')}.</p>`; return; }
     const outs = onto.rels.filter(r => r.domain === name), ins = onto.rels.filter(r => r.range === name && r.domain !== name);
     const props = [...c.props.entries()].sort((a, b) => b[1] - a[1]);
     const subs = [...onto.classes.values()].filter(x => x.parent === name);
@@ -3850,8 +3956,9 @@ function showEdge(eid) {
     ${r.evidence?.length ? `<h4>Evidence</h4>` + r.evidence.map(ev => `<div class="ev">${esc(ev.text)}<small>${esc(ev.doc)}</small></div>`).join('') : ''}`;
 }
 $('#details').addEventListener('click', ev => {
-  const t = ev.target.closest('[data-ent],[data-explore],[data-nbr],[data-cls]'); if (!t) return;
-  if (t.dataset.explore) exploreType(t.dataset.explore);
+  const t = ev.target.closest('[data-ent],[data-explore],[data-nbr],[data-cls],[data-tax]'); if (!t) return;
+  if (t.dataset.tax) { const id = 'C:' + t.dataset.tax; if (nodesDS.get(id)) { network.selectNodes([id]); network.focus(id, { scale: 1, animation: { duration: 500 } }); highlight(id); showNode(id); } }
+  else if (t.dataset.explore) exploreType(t.dataset.explore);
   else if (t.dataset.nbr) { S.focus = { kind: 'entity', value: t.dataset.nbr }; render(); setTimeout(() => focusEntity(t.dataset.nbr), 50); }
   else if (t.dataset.ent) focusEntity(t.dataset.ent);
   else if (t.dataset.cls) { if (S.view !== 'ontology') setView('ontology'); setTimeout(() => { const id = 'C:' + t.dataset.cls; if (nodesDS.get(id)) { network.selectNodes([id]); network.focus(id, { scale: 1, animation: { duration: 500 } }); highlight(id); showNode(id); } }, S.view === 'ontology' ? 0 : 900); }
@@ -3883,6 +3990,11 @@ function updateNames() {
 
 function doSearch(q) {
   q = q.trim().toLowerCase(); if (!q) return;
+  if (S.view === 'taxonomy') {
+    const ids = nodesDS.getIds().filter(i => /^[CE]:/.test(i)), name = i => i.startsWith('C:') ? i.slice(2) : S.ents.get(i.slice(2))?.name || '';
+    const hit = ids.find(i => name(i).toLowerCase() === q) || ids.find(i => name(i).toLowerCase().includes(q));
+    if (hit) { network.selectNodes([hit]); network.focus(hit, { scale: 1.1, animation: { duration: 500 } }); highlight(hit); showNode(hit); return; }
+  }
   if (S.view === 'ontology' && S.ontology) {
     const c = [...S.ontology.classes.keys()].find(k => k.toLowerCase() === q) || [...S.ontology.classes.keys()].find(k => k.toLowerCase().includes(q));
     if (c) { const id = 'C:' + c; network.selectNodes([id]); network.focus(id, { scale: 1.1, animation: { duration: 500 } }); highlight(id); showNode(id); return; }
@@ -4065,7 +4177,7 @@ function toPNG() {
   const src = $('#graph canvas'); if (!src) return;
   const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
   const x = c.getContext('2d'); x.fillStyle = css('--canvas') || '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(src, 0, 0);
-  const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = (S.view === 'ontology' ? 'ontology' : 'knowledge-graph') + '.png'; a.click();
+  const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = VIEW_SLUG[S.view] + '.png'; a.click();
 }
 function snapshotCanvas() {
   const src = $('#graph canvas'); if (!src || !src.width) return null;
@@ -4088,7 +4200,7 @@ function snapshotCanvas() {
       rows.forEach((r, i) => { const y = 48 + i * 20; x.beginPath(); x.arc(28, y, 5, 0, Math.PI * 2); x.fillStyle = r.col; x.fill(); x.fillStyle = css('--text'); x.font = `12px ${font}`; x.fillText(r.name, 40, y); x.fillStyle = css('--text-3'); x.font = `11px ${font}`; x.textAlign = 'right'; x.fillText(r.n, 12 + W - 12, y); x.textAlign = 'left'; });
     }
   }
-  const cap = `graphLOOM · ${S.view === 'ontology' ? 'Ontology' : 'Knowledge graph'} · ${$('#stats')?.textContent.trim() || ''}`.replace(/\s+·\s*$/, '');
+  const cap = `graphLOOM · ${VIEW_NAME[S.view]} ·${$('#stats')?.textContent.trim() || ''}`.replace(/\s+·\s*$/, '');
   x.font = `11px ${font}`; x.textBaseline = 'middle'; const cw = x.measureText(cap).width, ch = src.clientHeight || src.height / k;
   box(12, ch - 38, cw + 20, 26); x.fillStyle = css('--text-2'); x.fillText(cap, 22, ch - 25);
   return c;
@@ -4096,7 +4208,7 @@ function snapshotCanvas() {
 function saveSnapshot() {
   const c = snapshotCanvas(); if (!c) { log('Nothing to snapshot yet.', 'w'); return; }
   const d = new Date(), p = n => String(n).padStart(2, '0');
-  const name = `graphloom-${S.view === 'ontology' ? 'ontology' : 'knowledge-graph'}-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.png`;
+  const name = `graphloom-${VIEW_SLUG[S.view]}-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.png`;
   c.toBlob(b => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); toast(`Saved <b>${esc(name)}</b>`, 2500); }, 'image/png');
 }
 async function pushNeo4j() {
@@ -4859,6 +4971,7 @@ async function runSelfTest() {
     ok('Cypher only overwrites nodes graphLOOM created', /ON CREATE SET n\._source = "graphloom" WITH n WHERE n\._source IN/.test(toCypher()));
 
     group = 'Re-layout';
+    if (S.view === 'taxonomy') { setView('ontology'); await sleep(300); }
     if (S.layout !== 'force') { S.layout = 'force'; $('#tLayout').textContent = 'Layout: force'; render(); await sleep(300); }
     if (S.settling) freezeLayout(true);
     network.setOptions({ physics: { enabled: true } }); await new Promise(r => { const t = setTimeout(r, 4000); network.once('stabilizationIterationsDone', () => { clearTimeout(t); r(); }); network.stabilize(3000); }); network.setOptions({ physics: { enabled: false } }); await sleep(200);
@@ -4878,6 +4991,20 @@ async function runSelfTest() {
     ok('Esc leaves focus mode and puts the details panel back', !S.full && !$('.stage').classList.contains('fs') && $('aside.right').previousElementSibling === $('.stage') && /Full screen/.test($('#tFull').textContent));
     ok('view switch hidden outside full screen', getComputedStyle($('.fs-only')).display === 'none');
     setView('ontology'); ok('view switch follows the current view', $('#tOnto').classList.contains('on') && !$('#tKG').classList.contains('on'));
+
+    group = 'Taxonomy';
+    setView('taxonomy'); await sleep(300);
+    const txN = nodesDS.get(), txE = edgesDS.get(), inDeg = new Map();
+    txE.forEach(e => inDeg.set(e.to, (inDeg.get(e.to) || 0) + 1));
+    ok('taxonomy is a tree: one root, every other box has exactly one parent', txN.filter(n => !inDeg.get(n.id)).map(n => n.id).join() === 'T:Thing' && txN.every(n => n.id === 'T:Thing' || inDeg.get(n.id) === 1), txN.filter(n => n.id !== 'T:Thing' && inDeg.get(n.id) !== 1).map(n => n.id).join());
+    ok('children sit one level below their parent', txE.every(e => nodesDS.get(e.to).level === nodesDS.get(e.from).level + 1));
+    const txUp = id => txE.find(e => e.to === id)?.from;
+    const txBad = txN.filter(n => n.id.startsWith('C:')).filter(n => { const p = classParent(n.id.slice(2), S.ontology.classes); return txUp(n.id) !== (p && !S.hidden.has(p) ? 'C:' + p : 'T:Thing'); }).map(n => n.id);
+    ok('each class sits under its superclass (Organization ⊂ Agent ⊂ Thing)', !txBad.length && txUp('C:Organization') === 'C:Agent' && txUp('C:Agent') === 'T:Thing', txBad.join());
+    ok('every shown instance hangs off its own class', txN.filter(n => n.id.startsWith('E:')).every(n => txUp(n.id) === 'C:' + typeOf(S.ents.get(n.id.slice(2)))));
+    ok('taxonomy tab is marked and the layout toggle is off', $('#vTax').classList.contains('on') && $('#tTax').classList.contains('on') && $('#tLayout').disabled);
+    setView('ontology'); await sleep(300);
+    ok('leaving the taxonomy brings the force layout back', S._netLayout === S.layout && !$('#tLayout').disabled);
 
     group = 'Routing';
     await load({ 'r/only-table.md': FIXTURES.orgMarkdown['org/llm-output.md'], 'r/prose.txt': FIXTURES.orgText1['org/v1.txt'] });
@@ -5005,6 +5132,7 @@ document.querySelectorAll('input[name=eng]').forEach(r => r.closest('label').add
 try { const saved = JSON.parse(localStorage.getItem('aoe-llm') || '{}'); if (saved.url) $('#llmUrl').value = saved.url; if (saved.model) $('#llmModel').value = saved.model; } catch {}
 try { const saved = JSON.parse(localStorage.getItem('aoe-llm') || '{}'); if (saved.vmodel) $('#vlmModel').value = saved.vmodel; if (saved.vurl) $('#vlmUrl').value = saved.vurl; } catch {}
 ['#llmUrl', '#llmModel', '#vlmModel', '#vlmUrl'].forEach(s => $(s).addEventListener('change', () => { try { localStorage.setItem('aoe-llm', JSON.stringify({ url: $('#llmUrl').value, model: $('#llmModel').value, vmodel: $('#vlmModel').value, vurl: $('#vlmUrl').value })); } catch {} }));
+$('#vTax').onclick = () => setView('taxonomy');
 $('#vOnto').onclick = () => setView('ontology');
 $('#vKG').onclick = () => setView('kg');
 let rt;
@@ -5119,6 +5247,7 @@ $('#tZoomOut').onclick = () => zoomBy(1 / 1.35);
 $('#tLayout').onclick = () => { S.layout = S.layout === 'force' ? 'hier' : 'force'; $('#tLayout').textContent = 'Layout: ' + (S.layout === 'force' ? 'force' : 'hierarchy'); render(); };
 $('#tFull').onclick = () => setFull(!S.full);
 $('#tSnap').onclick = () => saveSnapshot();
+$('#tTax').onclick = () => setView('taxonomy');
 $('#tOnto').onclick = () => setView('ontology');
 $('#tKG').onclick = () => setView('kg');
 markView();
@@ -5128,6 +5257,7 @@ $('#q').addEventListener('change', e => doSearch(e.target.value));
 document.addEventListener('keydown', e => {
   if (e.target.matches && e.target.matches('input,textarea,select')) return;
   if (e.key === '/') { e.preventDefault(); $('#q').focus(); }
+  else if ((e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && !e.altKey) setView('taxonomy');
   else if (e.key === 'o' || e.key === 'O') setView('ontology');
   else if (e.key === 'k' || e.key === 'K') setView('kg');
   else if (e.key === '[') setPanels({ left: !panelOpen('left') });
