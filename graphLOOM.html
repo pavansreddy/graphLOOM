@@ -475,7 +475,7 @@ const PLACE_LIST = ['united states','united kingdom','south africa','new zealand
 PLACE_LIST.forEach(p => PLACES.add(p));
 const FIRST = new Set('james john robert michael william david richard joseph thomas charles christopher daniel matthew anthony mark donald steven paul andrew joshua kenneth kevin brian george timothy ronald edward jason jeffrey ryan jacob gary nicholas eric jonathan stephen larry justin scott brandon benjamin samuel gregory alexander frank patrick raymond jack dennis jerry tyler aaron jose adam nathan henry douglas zachary peter kyle noah ethan jeremy walter christian keith roger terry austin sean gerald carl harold dylan arthur lawrence jordan jesse bryan billy bruce gabriel joe logan alan juan albert willie elijah wayne randy vincent mary patricia jennifer linda elizabeth barbara susan jessica sarah karen lisa nancy betty margaret sandra ashley kimberly emily donna michelle carol amanda dorothy melissa deborah stephanie rebecca sharon laura cynthia kathleen amy angela shirley anna brenda pamela emma nicole helen samantha katherine christine debra rachel carolyn janet catherine maria heather diane ruth julie olivia joyce virginia victoria kelly lauren christina joan evelyn judith megan andrea cheryl hannah jacqueline martha gloria teresa ann sara madison frances kathryn janice jean abigail alice judy sophia grace denise amber doris marilyn danielle beverly isabella theresa diana natalie brittany charlotte marie kayla alexis lori maya priya omar lena diego sam samir ravi raj rahul arjun anil sunil amit vijay suresh ramesh pavan anita sunita neha pooja kavya deepa aisha fatima ahmed mohammed muhammad ali hassan yusuf ibrahim mustafa wei li ming jun hui yan xin jing chen hiroshi yuki kenji akira takashi sakura min ji seo hyun carlos luis jorge miguel pedro ana lucia sofia elena marco luca giulia francesco hans klaus jurgen lars sven ingrid olga ivan dmitri sergei natasha jensen satya sundar elon tim sam mark bill steve larry sergey jeff lisa ginni marissa sheryl reed'.split(' '));
 const RX = {
-  org: /\b(inc|corp|corporation|company|co|llc|ltd|plc|gmbh|ag|group|holdings|bank|bancorp|university|college|institute|school|academy|foundation|agency|department|ministry|association|society|council|committee|commission|authority|labs?|laboratory|laboratories|technologies|systems|solutions|partners|ventures|capital|airlines|airways|motors|pharma\w*|therapeutics|hospital|clinic|museum|federation|union|studios|media|networks|robotics|logistics|dynamics|semiconductors?|electronics|energy|aerospace|industries|enterprises|consulting|analytics|trust|bureau|office|organization|organisation|corps|alliance|consortium|coalition|fund|team|squad|crew|tribe|guild)\b/i,
+  org: /\b(inc|corp|corporation|company|co|llc|ltd|plc|gmbh|ag|group|holdings|bank|bancorp|university|college|institute|school|academy|foundation|agency|department|ministry|association|society|council|committee|commission|authority|labs?|laboratory|laboratories|technologies|systems|solutions|partners|ventures|capital|airlines|airways|motors|pharma\w*|therapeutics|hospital|clinic|museum|federation|union|studios|media|networks|robotics|logistics|dynamics|semiconductors?|electronics|energy|aerospace|industries|enterprises|consulting|analytics|trust|farms|foods|bakery|bakeries|brewery|breweries|winery|wineries|pharmacy|pharmacies|insurance|bureau|office|organization|organisation|corps|alliance|consortium|coalition|fund|team|squad|crew|tribe|guild)\b/i,
   loc: /\b(city|county|state|province|river|lake|mountains?|mount|island|islands|valley|street|st|avenue|ave|road|rd|boulevard|park|bay|ocean|sea|region|district|airport|harbor|harbour|coast|desert|peninsula|canyon|campus|square|plaza|village|town)\b$/i,
   event: /\b(conference|summit|festival|war|election|olympics|championship|expo|forum|meeting|symposium|workshop|webinar|hackathon|keynote|cup|games|convention|gala|ceremony|tournament|launch event|gtc|ces|re:invent)\b/i,
   doc: /\b(act|law|report|policy|paper|standard|agreement|treaty|contract|guidelines?|specification|spec|whitepaper|regulation|bill|charter|manual|handbook|rfc|iso|memo|proposal|thesis|article)\b/i,
@@ -533,7 +533,7 @@ const RULES = [
   [/\b(co-?)?found(ed|s)\b|\bestablished\b/, 'FOUNDED'],
   [/\b(developed|built|designed|created|made|produced|engineered|invented) by\b/, 'DEVELOPED', true],
   [/\b(funded|backed|financed|sponsored) by\b/, 'INVESTED_IN', true],
-  [/\b(headquartered|based|located|situated|hq'?d?|incorporated)\s+(in|at|near|out of)\b/, 'LOCATED_IN'],
+  [/\b(headquartered|based|located|situated|hq'?d?|incorporated|registered|domiciled)\s+(in|at|near|out of)\b/, 'LOCATED_IN'],
   [/\b(expand\w*|operat\w*|offices?|opened|presence|facilit\w+|plant)\b.*\bin\s*$/, 'OPERATES_IN'],
   [/\bborn in\b/, 'BORN_IN'],
   [/\b(lives?|lived|resides?|resided|moved|relocated) (in|to)\b/, 'LIVES_IN'],
@@ -2625,7 +2625,7 @@ async function heuristicExtract(textDocs) {
   const nerMap = aiOn() ? await nerAnnotate(perDoc) : null;
   const sentMentions = [], nSents = perDoc.reduce((a, x) => a + x.sents.length, 0); let kS = 0;
   for (const { d, sents } of perDoc) {
-    const recent = [];
+    const recent = []; let prevSubj = null;
     for (const s of sents) {
       await breathe('Finding entities…', ++kS, nSents);
       let ms = findCandidates(s, vocab);
@@ -2649,7 +2649,12 @@ async function heuristicExtract(textDocs) {
           if (words.includes(w) || tt === w || classFromWord(w).toLowerCase() === tt || (headParent(classFromWord(w)) || '').toLowerCase() === tt) { ms.push({ start: i, end: e, name: t.name, id: t.id, coref: true }); break; }
         }
       }
-      if (!ms.length) continue;
+      const pro = s.match(/^(It|He|She)\b/);
+      if (pro && prevSubj && !/^It\s+(?:is|was|seems|appears|remains|has been|had been|will be|would be|may be|might be)\s+(?:[a-z]+\s+){0,4}?(?:that|to|whether|how|why|if)\b/i.test(s) && !ms.some(m => m.start < pro[0].length)) {
+        const t = S.ents.get(R(prevSubj));
+        if (t && !t.isDoc) { const tt = typeOf(t), isP = tt === 'Person' || (tt === 'Concept' && looksLikePersonName(t.name)); if (isP === (pro[1] !== 'It')) ms.push({ start: 0, end: pro[0].length, name: t.name, id: t.id, coref: true }); }
+      }
+      if (!ms.length) { prevSubj = null; continue; }
       ms.sort((a, b) => a.start - b.start || b.end - a.end);
       ms = ms.filter((m, i) => !ms.some((o, j) => j !== i && o.start <= m.start && o.end >= m.end && (o.end - o.start) > (m.end - m.start)));
       for (const m of ms) {
@@ -2666,6 +2671,7 @@ async function heuristicExtract(textDocs) {
         }
       }
       for (const m of ms) if (m.id && !m.coref) { const id = R(m.id); const p = recent.indexOf(id); if (p >= 0) recent.splice(p, 1); recent.push(id); if (recent.length > 40) recent.shift(); }
+      { const f = ms.filter(m => m.id).sort((a, b) => a.start - b.start)[0]; prevSubj = f && !s.slice(0, f.start).replace(/^\s*(?:the|a|an)\s+/i, '').trim() && /^\s*(?:,[^,]{0,80},\s*)?(?:[a-z]+ly\s+)?(?:is|was|are|were|has|had|have|will|would|can|could|[a-z]{3,}(?:s|ed))\b/i.test(s.slice(f.end)) ? f.id : null; }
       sentMentions.push({ d, s, ms: ms.filter(m => m.id) });
     }
   }
@@ -2751,7 +2757,7 @@ async function heuristicExtract(textDocs) {
         let subj = ea, coordOk = true;
         if (i > 0 && /^\s*,/.test(between)) {
           const prevBetween = gap(list[i - 1].end, a.start);
-          if (/^\s*,\s*(?:a|an|the|which|who|whose|its|one of)\b[^,]*$/i.test(prevBetween)) { const ep = S.ents.get(R(list[i - 1].id)); if (ep && ep !== eb) { subj = ep; coordOk = false; } }
+          if (/^\s*,\s*(?:(?:a|an|the|which|who|whose|its|one of)\b|[a-z]+(?:ed|en|wn)\s+(?:in|at|on|near|from|by|out of|outside)\b)[^,]*$/i.test(prevBetween)) { const ep = S.ents.get(R(list[i - 1].id)); if (ep && ep !== eb) { subj = ep; coordOk = false; } }
         }
         if (clauseSubj && clauseSubj !== eb && objIdx.has(i) && /^\s*,?\s*(and|but|then|while|yet)\s+(?:also\s+|then\s+|later\s+|now\s+)?[a-z]{3,}/.test(lb)) { subj = clauseSubj; coordOk = false; }
         clauseSubj = subj;
@@ -2788,7 +2794,7 @@ async function heuristicExtract(textDocs) {
   log(`  ${fmt(sentMentions.length)} sentences with entities · ${fmt(typed)} typed + ${fmt(co)} co-occurrence links`);
 }
 const HEAD_MAP = [
-  [/^(company|firm|startup|corporation|business|manufacturer|retailer|bank|nonprofit|non-profit|charity|agency|vendor|supplier|provider|maker|conglomerate|subsidiary|organi[sz]ation|institution|university|college|school|lab|laboratory|insurer|airline|automaker|brand|chain|publisher|studio|team|club|union|party|ministry|government|regulator|investor|fund|consultancy|distributor|operator|carrier|utility)$/, 'Organization'],
+  [/^(company|firm|startup|corporation|business|manufacturer|retailer|bank|nonprofit|non-profit|charity|agency|vendor|supplier|provider|maker|conglomerate|subsidiary|organi[sz]ation|institution|university|college|school|lab|laboratory|insurer|airline|automaker|brand|chain|publisher|studio|team|club|union|party|ministry|government|regulator|investor|fund|consultancy|distributor|operator|carrier|utility|hospital|clinic|practice|hospice|pharmacy|bakery|restaurant|cafe|hotel|store|shop|supermarket|grocer|brewery|winery|farm|factory|foundation|association|society|institute|academy|council|federation|alliance|consortium|coalition|cooperative|co-op|partnership|ngo|newspaper|broadcaster|franchise)$/, 'Organization'],
   [/^(city|town|village|country|nation|state|province|region|county|capital|island|continent|district|neighbo(u)?rhood|suburb|metropolis|port|river|lake|mountain)$/, 'Location'],
   [/^(person|man|woman|engineer|scientist|researcher|doctor|physician|professor|author|writer|founder|executive|entrepreneur|ceo|cto|cfo|politician|senator|actor|actress|singer|artist|athlete|player|journalist|lawyer|economist|investor|billionaire|philanthropist|chemist|physicist|mathematician|developer|designer|manager|director|analyst|student|teacher|nurse|pilot|architect)$/, 'Person'],
   [/^(conference|summit|festival|event|competition|tournament|election|war|battle|exhibition|expo|meeting|workshop|webinar|hackathon|ceremony)$/, 'Event'],
@@ -2804,6 +2810,7 @@ function classFromDefinition(after) {
   let head = singular(words[words.length - 1]);
   if (head.length < 3 || HEAD_GENERIC.has(head) || /(ly|ed|ous|ful|able|ible|est|er than)$/.test(head)) return null;
   for (const [rx, t] of HEAD_MAP) if (rx.test(head)) return t;
+  if (/^(network|system|chain|group|alliance|collective|trust|holding|operation|provider)$/.test(head)) for (const w of words.slice(0, -1).reverse()) { const m = HEAD_MAP.find(([rx]) => rx.test(singular(w))); if (m) return m[1] === 'Location' ? null : m[1] === 'Product' ? null : 'Organization'; }
   const SYN = { medication: 'Drug', medicine: 'Drug', pharmaceutical: 'Drug', molecule: 'Compound', automobile: 'Vehicle', film: 'Movie', programme: 'Program' };
   return SYN[head] || pascal(head);
 }
@@ -2824,7 +2831,9 @@ function matchRel(between, lb, ea, eb, a) {
   if (/^[\s,'’s]*$/.test(lb) && a.role) return null;
   if (/^\s*['’]s?\s*$/.test(lb)) return { type: tA === 'Organization' && tB === 'Person' ? 'EMPLOYS' : 'HAS', prov: P.typed };
   if (/\b(between|among|amongst)\s*(?:the\s+)?$/.test(lb)) return { type: 'INVOLVES', prov: P.rule };
-  const passiveBy = /\b(is|are|was|were|been|being|be|gets?|got)\s+(?:\w+ly\s+)?\w+(ed|en|wn|lt|ought|ght)\s+by(\s+(the|a|an))?\s*$/.test(lb);
+  { const ap = lb.match(/^\s*,\s*(?:a|an|the|one of the)\s+((?:[a-z][a-z-]*\s+){0,4}?)([a-z][a-z-]*)\s+(?:in|near|outside|just outside)\s+(?:the\s+)?$/);
+    if (ap && tB !== 'Person' && tB !== 'Organization' && !HEAD_GENERIC.has(singular(ap[2]))) { const h = HEAD_MAP.find(([rx]) => rx.test(singular(ap[2]))); if (h && (h[1] === 'Organization' || h[1] === 'Person')) return { type: 'LOCATED_IN', prov: P.rule }; } }
+  const passiveBy = /\b(is|are|was|were|been|being|be|gets?|got)\s+(?:\w+ly\s+)?\w+(ed|en|wn|lt|ought|ght)(?:\s+(?:in|on|at|during|since|around|back in)\s+[\w$.,]+(?:\s+\d{4})?)?\s+by(\s+(the|a|an))?\s*$/.test(lb);
   const lbNoBy = lb.replace(/\s+by(\s+(the|a|an))?\s*$/, ' ');
   for (const [rx, type, rev] of RULES) {
     if (!rx.test(lb)) continue;
@@ -4482,6 +4491,9 @@ $('#diag').addEventListener('click', e => { const b = e.target.closest('button[d
 const T_ORG = [['Jerry Daniels', 'Elaine Dela Cruz'], ['Edward Scott', 'Elaine Dela Cruz'], ['Eliza Cain', 'Jerry Daniels'], ['Vanessa Lorriet', 'Jerry Daniels'], ['Joseph Spinelli', 'Edward Scott'], ['Paula Rand', 'Eliza Cain'], ['Tony Fresco', 'Vanessa Lorriet'], ['Julia Paige', 'Joseph Spinelli']];
 const T_PEOPLE = [['Elaine Dela Cruz', 'CEO', '*None (Top Level)*'], ['Jerry Daniels', 'VP Marketing', 'Elaine Dela Cruz'], ['Edward Scott', 'VP Operations', 'Elaine Dela Cruz'], ['Eliza Cain', 'Director, Marketing', 'Jerry Daniels'], ['Vanessa Lorriet', 'Director, Public Relations', 'Jerry Daniels'], ['Joseph Spinelli', 'Manager, Operations', 'Edward Scott'], ['Paula Rand', 'Marketing Lead', 'Eliza Cain'], ['Tony Fresco', 'Brand Strategist', 'Vanessa Lorriet'], ['Julia Paige', 'Facility Supervisor', 'Joseph Spinelli']];
 const FIXTURES = {
+  heldOut: { 'held/overview.md': `# Brightwater Health\n\nBrightwater Health is a hospital network based in Portland. It was founded in 1998 by Elena Ruiz. Today Brightwater Health is led by Marcus Bell, its chief executive.\n\nIn 2022 Brightwater Health bought Cedar Clinic, a small practice in Salem, for $8 million. Brightwater Health did not acquire Northgate Labs.\n\nNorthgate Labs, headquartered in Seattle, makes the Pulse Monitor. The Pulse Monitor runs on the Helix Chip, which is produced by Arden Micro.`,
+    'held/staff.csv': `name,role,team,employer,city\nNora Quinn,Head of Nursing,Nursing,Brightwater Health,Portland\nRavi Shah,Data Engineer,Analytics,Brightwater Health,Portland`,
+    'held/notes.txt': `Orchard Foods is a grocery chain based in Leeds. Orchard Foods, registered in Manchester, sells fresh produce. Greenfield Farms is owned by Tarn Holdings. It is likely that Tarn Holdings will grow. Ruth Hale joined Tarn Holdings in 2020. She was hired by Tarn Holdings in 2020.` },
   orgText1: { 'org/v1.txt': `Elaine Dela Cruz (CEO) oversees Jerry Daniels (VP Marketing) and Edward Scott (VP Operations). Jerry Daniels and Edward Scott report to Elaine Dela Cruz. Eliza Cain, Director of Marketing, reports directly to Jerry Daniels. Vanessa Lorriet, the Director of Public Relations, reports to Jerry Daniels. Joseph Spinelli is managed by Edward Scott. Eliza Cain is the manager of Paula Rand. Vanessa Lorriet supervises Tony Fresco. Julia Paige works under Joseph Spinelli.` },
   orgText2: { 'org/v2.txt': `The CEO, Elaine Dela Cruz, has two direct reports: Jerry Daniels and Edward Scott. Under Jerry Daniels are Eliza Cain and Vanessa Lorriet. Edward Scott manages Joseph Spinelli. Paula Rand reports to Eliza Cain, Tony Fresco reports to Vanessa Lorriet, and Julia Paige reports to Joseph Spinelli.` },
   orgMarkdown: { 'org/llm-output.md': `## Extracted Entities\n\n| Name | Title | Tel / Ext | Email | Reports To |\n| --- | --- | --- | --- | --- |\n` + T_PEOPLE.map((p, i) => `| ${p[0]} | ${p[1]} | 000-555-5555 ext.${i + 1} | ${p[0].split(' ').pop().toLowerCase()}@polaris.com | ${p[2]} |`).join('\n') + `\n\n\`\`\`mermaid\ngraph TD\n  P["Polaris (Organization)"]\n  CEO["Elaine Dela Cruz<br/>CEO"]\n  CEO -.->|worksFor| P\n\`\`\`\n` },
@@ -5005,6 +5017,21 @@ async function runSelfTest() {
     ok('taxonomy tab is marked and the layout toggle is off', $('#vTax').classList.contains('on') && $('#tTax').classList.contains('on') && $('#tLayout').disabled);
     setView('ontology'); await sleep(300);
     ok('leaving the taxonomy brings the force layout back', S._netLayout === S.layout && !$('#tLayout').disabled);
+
+    group = 'Unseen phrasing';
+    await load(FIXTURES.heldOut);
+    const hoRel = (a, t, b) => RELS().some(r => r.type === t && S.ents.get(R(r.from))?.name === a && S.ents.get(R(r.to))?.name === b && relAssertion(r) === 'asserted');
+    const hoCls = n => { const e = E(n); return e ? typeOf(e) : '—'; };
+    ok('"a hospital network", "a small practice", "a grocery chain" are Organizations', ['Brightwater Health', 'Cedar Clinic', 'Orchard Foods'].every(n => hoCls(n) === 'Organization'), ['Brightwater Health', 'Cedar Clinic', 'Orchard Foods'].map(hoCls).join(' / '));
+    ok('"It was founded in 1998 by X" links X to the previous sentence\'s subject', hoRel('Elena Ruiz', 'FOUNDED', 'Brightwater Health'));
+    ok('"X, headquartered in Y, makes Z": X is the subject, not Y', hoRel('Northgate Labs', 'DEVELOPED', 'Pulse Monitor') && !RELS().some(r => S.ents.get(R(r.from))?.name === 'Seattle' && r.type === 'DEVELOPED'));
+    ok('"which is produced by Arden Micro" keeps Arden Micro an Organization', hoCls('Arden Micro') === 'Organization' && hoRel('Arden Micro', 'DEVELOPED', 'Helix Chip'), hoCls('Arden Micro'));
+    ok('"X, a small practice in Salem" gives X LOCATED_IN Salem', hoRel('Cedar Clinic', 'LOCATED_IN', 'Salem') && hoCls('Salem') === 'Location', hoCls('Salem'));
+    ok('departments from a table attach to their employer', hoRel('Nursing', 'PART_OF', 'Brightwater Health') && hoRel('Analytics', 'PART_OF', 'Brightwater Health'));
+    ok('"registered in" is a location; the plural "Farms" names an Organization', hoRel('Orchard Foods', 'LOCATED_IN', 'Manchester') && hoCls('Greenfield Farms') === 'Organization', hoCls('Greenfield Farms'));
+    const hoEv = (n, rx) => (E(n)?.evidence || []).some(ev => rx.test(ev.text));
+    ok('"It is likely that…" is not read as a pronoun; "She" resolves only to a person', !hoEv('Greenfield Farms', /^It is likely/) && hoEv('Ruth Hale', /^She was hired/));
+    ok('negated "did not acquire" stays hidden', !hoRel('Brightwater Health', 'ACQUIRED', 'Northgate Labs') && hoRel('Brightwater Health', 'ACQUIRED', 'Cedar Clinic'));
 
     group = 'Routing';
     await load({ 'r/only-table.md': FIXTURES.orgMarkdown['org/llm-output.md'], 'r/prose.txt': FIXTURES.orgText1['org/v1.txt'] });
